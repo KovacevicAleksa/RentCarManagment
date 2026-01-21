@@ -1,0 +1,63 @@
+{
+  "$schema": "https://cdn.statically.io/gh/nguyenngoclongdev/cdn/main/schema/v11/terminal-keeper.json",
+  "theme": "tribe",
+  "active": "default",
+  "activateOnStartup": true,
+  "keepExistingTerminals": false,
+  "sessions": {
+    "default": [
+      [
+        {
+          "name": "backend",
+          "icon": "repo",
+          "color": "terminal.ansiBrightWhite",
+          "cwd": "${workspaceFolder}",
+          "commands": [
+            "git status"
+          ],
+          "autoExecuteCommands": true
+        }
+      ],
+      [
+        {
+          "name": "backend",
+          "icon": "organization",
+          "color": "terminal.ansiBrightWhite",
+          "cwd": "${workspaceFolder}/backend",
+          "commands": [],
+          "autoExecuteCommands": true
+        }
+      ],
+      [
+        {
+          "name": "frontend",
+          "icon": "organization",
+          "color": "terminal.ansiGreen",
+          "cwd": "${workspaceFolder}/frontend",
+          "commands": []
+        }
+      ],
+      [
+        {
+          "name": "car",
+          "icon": "organization",
+          "color": "terminal.ansiBrightBlue",
+          "cwd": "${workspaceFolder}/car",
+          "commands": []
+        }
+      ],
+      [
+        {
+          "name": "Build&Install",
+          "icon": "package",
+          "color": "terminal.ansiBrightBlack",
+          "cwd": "${workspaceFolder}",
+          "commands": [
+            "pnpm i -r"
+          ],
+          "autoExecuteCommands": true
+        }
+      ]
+    ]
+  }
+}

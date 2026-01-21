@@ -1,0 +1,8 @@
+{
+  "recommendations": ["nguyenngoclong.terminal-keeper", "esbenp.prettier-vscode"]
+}
+
+/*
+code --install-extension nguyenngoclong.terminal-keeper
+code --install-extension esbenp.prettier-vscode
+*/
