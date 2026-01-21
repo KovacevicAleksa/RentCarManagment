@@ -8,7 +8,7 @@
     "default": [
       [
         {
-          "name": "backend",
+          "name": "root",
           "icon": "repo",
           "color": "terminal.ansiBrightWhite",
           "cwd": "${workspaceFolder}",
@@ -24,7 +24,9 @@
           "icon": "organization",
           "color": "terminal.ansiBrightWhite",
           "cwd": "${workspaceFolder}/backend",
-          "commands": [],
+          "commands": [
+            "cd backend"
+          ],
           "autoExecuteCommands": true
         }
       ],
@@ -33,8 +35,10 @@
           "name": "frontend",
           "icon": "organization",
           "color": "terminal.ansiGreen",
-          "cwd": "${workspaceFolder}/frontend",
-          "commands": []
+          "commands": [
+            "cd frontend"
+          ],
+          "autoExecuteCommands": true
         }
       ],
       [
@@ -42,8 +46,11 @@
           "name": "car",
           "icon": "organization",
           "color": "terminal.ansiBrightBlue",
-          "cwd": "${workspaceFolder}/car",
-          "commands": []
+          "cwd": "${workspaceFolder}",
+          "commands": [
+            "cd car"
+          ],
+          "autoExecuteCommands": true
         }
       ],
       [
