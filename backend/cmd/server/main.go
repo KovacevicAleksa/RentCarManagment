@@ -37,7 +37,9 @@ func main() {
 
 	authRepo := auth.NewAuthRepository(dbConn)
 	authService := auth.NewAuthService(authRepo)
+	
 	auth.RegisterRoutes(r, authService)
 
+	log.Println("Server starting on :8010")
 	r.Run(":8010")
 }

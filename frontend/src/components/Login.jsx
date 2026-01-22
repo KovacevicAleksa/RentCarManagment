@@ -3,13 +3,12 @@ import { Lock, Mail, Eye, EyeOff } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
 
-export default function Login() {
+export default function Login({ onLoginSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [token, setToken] = useState("");
 
   const handleLogin = async () => {
     setMessage("");
@@ -20,6 +19,7 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "include",
       });
 
       const data = await res.json();
@@ -30,13 +30,12 @@ export default function Login() {
         return;
       }
 
-      setToken(data.token);
       setMessage("Uspešno ste se prijavili!");
-
-      // Sačuvaj token u localStorage
-      localStorage.setItem("token", data.token);
-
       setLoading(false);
+
+      setTimeout(() => {
+        onLoginSuccess();
+      }, 500);
     } catch (err) {
       setMessage("Greška u mreži");
       setLoading(false);
@@ -45,7 +44,6 @@ export default function Login() {
 
   return (
     <div className="space-y-5">
-      {/* Email Input */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Email adresa
@@ -63,7 +61,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Password Input */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Lozinka
@@ -92,7 +89,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Forgot Password */}
       <div className="flex items-center justify-between text-sm">
         <label className="flex items-center">
           <input type="checkbox" className="mr-2 rounded" />
@@ -103,7 +99,6 @@ export default function Login() {
         </a>
       </div>
 
-      {/* Submit Button */}
       <button
         onClick={handleLogin}
         disabled={loading || !email || !password}
@@ -112,7 +107,6 @@ export default function Login() {
         {loading ? "Prijava u toku..." : "Prijavi se"}
       </button>
 
-      {/* Message */}
       {message && (
         <div
           className={`p-4 rounded-xl text-sm ${
@@ -122,14 +116,6 @@ export default function Login() {
           }`}
         >
           {message}
-        </div>
-      )}
-
-      {/* Token Display */}
-      {token && (
-        <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-          <p className="text-xs text-gray-600 mb-1">JWT Token:</p>
-          <p className="text-xs text-gray-800 font-mono break-all">{token}</p>
         </div>
       )}
     </div>

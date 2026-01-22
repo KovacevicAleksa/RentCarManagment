@@ -17,14 +17,17 @@ func NewAuthService(repo *AuthRepository) *AuthService {
 	return &AuthService{repo: repo}
 }
 
-// Registracija korisnika
 func (s *AuthService) Register(email, password string) error {
 	existing, _ := s.repo.FindByEmail(email)
 	if existing != nil {
 		return errors.New("user already exists")
 	}
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
 	user := &User{
 		Email:    email,
 		Password: string(hash),
@@ -33,28 +36,31 @@ func (s *AuthService) Register(email, password string) error {
 	return s.repo.CreateUser(user)
 }
 
-// Login i JWT token generisanje
-func (s *AuthService) Login(email, password string) (string, error) {
+func (s *AuthService) Login(email, password string) (string, uint, error) {
 	user, err := s.repo.FindByEmail(email)
 	if err != nil || user == nil {
-		return "", errors.New("invalid email or password")
+		return "", 0, errors.New("invalid email or password")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		return "", errors.New("invalid email or password")
+		return "", 0, errors.New("invalid email or password")
 	}
 
-	// JWT token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.ID,
+		"email":   user.Email,
 		"exp":     time.Now().Add(time.Hour * 72).Unix(),
 	})
 
 	secret := os.Getenv("JWT_SECRET")
-	tokenString, err := token.SignedString([]byte(secret))
-	if err != nil {
-		return "", err
+	if secret == "" {
+		return "", 0, errors.New("JWT_SECRET not set")
 	}
 
-	return tokenString, nil
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", 0, err
+	}
+
+	return tokenString, user.ID, nil
 }

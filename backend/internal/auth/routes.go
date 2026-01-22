@@ -7,5 +7,8 @@ func RegisterRoutes(r *gin.Engine, service *AuthService) {
 	{
 		authGroup.POST("/register", RegisterHandler(service))
 		authGroup.POST("/login", LoginHandler(service))
+		authGroup.POST("/logout", LogoutHandler())
+		
+		authGroup.GET("/me", AuthMiddleware(), MeHandler())
 	}
 }
