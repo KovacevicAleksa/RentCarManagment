@@ -1,0 +1,36 @@
+# Node.js / Go / general
+node_modules
+dist
+build
+bin
+obj
+
+
+# Logs
+*.log
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Git
+.git
+.gitignore
+
+# VSCode
+.vscode
+*.code-workspace
+
+# Mac / OS
+.DS_Store
+Thumbs.db
+
+# Temporary / system files
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# Docker itself
+docker-compose.override.yml
+docker-compose.*.override.yml
