@@ -10,6 +10,7 @@ import (
 
 	"github.com/KovacevicAleksa/rentcar/backend/internal/auth"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/db"
+	"github.com/KovacevicAleksa/rentcar/backend/internal/mqtt"
 )
 
 func main() {
@@ -29,16 +30,28 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// Database setup
 	dbConn := db.NewPostgresConnection()
-
 	if err := dbConn.AutoMigrate(&auth.User{}); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
 
+	// Auth setup
 	authRepo := auth.NewAuthRepository(dbConn)
 	authService := auth.NewAuthService(authRepo)
-	
 	auth.RegisterRoutes(r, authService)
+
+	// MQTT setup
+	mqttClient := mqtt.NewClient()
+	mqttService := mqtt.NewService(mqttClient)
+
+	topics := map[string]mqtt.MessageHandler{
+		"test/topic": mqtt.DefaultMessageHandler,
+	}
+
+	if err := mqttService.Start(topics); err != nil {
+		log.Printf("MQTT service failed to start: %v", err)
+	}
 
 	log.Println("Server starting on :8010")
 	r.Run(":8010")
