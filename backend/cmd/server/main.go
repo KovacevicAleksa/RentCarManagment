@@ -46,7 +46,7 @@ func main() {
 	mqttService := mqtt.NewService(mqttClient)
 
 	topics := map[string]mqtt.MessageHandler{
-		"test/topic": mqtt.DefaultMessageHandler,
+		"car/telemetry": mqtt.CarTelemetryHandler,
 	}
 
 	if err := mqttService.Start(topics); err != nil {
