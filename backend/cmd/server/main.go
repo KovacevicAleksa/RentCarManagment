@@ -10,6 +10,7 @@ import (
 
 	"github.com/KovacevicAleksa/rentcar/backend/internal/auth"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/db"
+	"github.com/KovacevicAleksa/rentcar/backend/internal/history"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/mqtt"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/websocket"
 )
@@ -31,16 +32,35 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// Database setup
-	dbConn := db.NewPostgresConnection()
-	if err := dbConn.AutoMigrate(&auth.User{}); err != nil {
-		log.Fatal("Failed to migrate database:", err)
+	postgresConn := db.NewPostgresConnection()
+	timescaleConn := db.NewTimescaleConnection()
+
+	if err := postgresConn.AutoMigrate(&auth.User{}); err != nil {
+		log.Fatal("Failed to migrate Postgres:", err)
 	}
 
-	// Auth setup
-	authRepo := auth.NewAuthRepository(dbConn)
+	if err := db.EnableTimescaleDB(timescaleConn); err != nil {
+		log.Printf("TimescaleDB error: %v", err)
+	}
+
+	if err := timescaleConn.AutoMigrate(&history.CarHistory{}); err != nil {
+		log.Fatal("Failed to migrate TimescaleDB:", err)
+	}
+
+	if err := db.ConvertToHypertable(timescaleConn, "car_histories", "timestamp"); err != nil {
+		log.Printf("Hypertable error: %v", err)
+	} else {
+		db.CreateCompressionPolicy(timescaleConn, "car_histories", "7 days")
+		db.CreateRetentionPolicy(timescaleConn, "car_histories", "90 days")
+	}
+
+	authRepo := auth.NewAuthRepository(postgresConn)
 	authService := auth.NewAuthService(authRepo)
 	auth.RegisterRoutes(r, authService)
+
+	historyRepo := history.NewHistoryRepository(timescaleConn)
+	historyService := history.NewHistoryService(historyRepo)
+	history.RegisterRoutes(r, historyService)
 
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
@@ -50,6 +70,7 @@ func main() {
 	})
 
 	mqtt.SetBroadcaster(wsHub)
+	mqtt.SetHistorySaver(historyService)
 
 	mqttClient := mqtt.NewClient()
 	mqttService := mqtt.NewService(mqttClient)
@@ -59,7 +80,7 @@ func main() {
 	}
 
 	if err := mqttService.Start(topics); err != nil {
-		log.Printf("MQTT service failed to start: %v", err)
+		log.Printf("MQTT failed: %v", err)
 	}
 
 	log.Println("Server starting on :8010")

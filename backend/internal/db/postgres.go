@@ -24,6 +24,25 @@ func NewPostgresConnection() *gorm.DB {
 		log.Fatal("Failed to connect to Postgres:", err)
 	}
 
-	fmt.Println("Connected to Postgres via Gorm")
+	fmt.Println("Connected to Postgres")
+	return db
+}
+
+func NewTimescaleConnection() *gorm.DB {
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		os.Getenv("TIMESCALE_HOST"),
+		os.Getenv("TIMESCALE_USER"),
+		os.Getenv("TIMESCALE_PASSWORD"),
+		os.Getenv("TIMESCALE_DB"),
+		os.Getenv("TIMESCALE_PORT"),
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal("Failed to connect to TimescaleDB:", err)
+	}
+
+	fmt.Println("Connected to TimescaleDB")
 	return db
 }

@@ -23,30 +23,39 @@ type TelemetryBroadcaster interface {
 	BroadcastTelemetry(data interface{})
 }
 
+type HistorySaver interface {
+	SaveTelemetry(carID string, fuel, lat, lon float64) error
+}
+
 var broadcaster TelemetryBroadcaster
+var historySaver HistorySaver
 
 func SetBroadcaster(b TelemetryBroadcaster) {
 	broadcaster = b
-	log.Println("✅ MQTT Broadcaster postavljen")
+	log.Println("MQTT Broadcaster set")
+}
+
+func SetHistorySaver(h HistorySaver) {
+	historySaver = h
+	log.Println("MQTT History Saver set")
 }
 
 func DefaultMessageHandler(client mqtt.Client, msg mqtt.Message) {
-	log.Printf("📩 MQTT Poruka primljena!")
-	log.Printf("   Topic: %s", msg.Topic())
-	log.Printf("   Poruka: %s", string(msg.Payload()))
+	log.Printf("MQTT message received")
+	log.Printf("Topic: %s", msg.Topic())
+	log.Printf("Payload: %s", string(msg.Payload()))
 }
 
 func CarTelemetryHandler(client mqtt.Client, msg mqtt.Message) {
 	var telemetry CarTelemetry
 	
 	if err := json.Unmarshal(msg.Payload(), &telemetry); err != nil {
-		log.Printf("❌ Error parsing telemetry: %v", err)
-		log.Printf("   Payload: %s", string(msg.Payload()))
+		log.Printf("Error parsing telemetry: %v", err)
 		return
 	}
 
 	if telemetry.CarID == "" {
-		log.Printf("⚠️ Telemetry missing car_id")
+		log.Printf("Missing car_id")
 		return
 	}
 
@@ -55,13 +64,11 @@ func CarTelemetryHandler(client mqtt.Client, msg mqtt.Message) {
 	}
 
 	if telemetry.EngineTemperature < -50 || telemetry.EngineTemperature > 200 {
-		log.Printf("⚠️ [%s] Suspicious engine temperature: %.1f°C", 
+		log.Printf("[%s] Suspicious engine temp: %.1f°C", 
 			telemetry.CarID, telemetry.EngineTemperature)
 	}
 
 	if telemetry.FuelLevel < 0 || telemetry.FuelLevel > 100 {
-		log.Printf("⚠️ [%s] Invalid fuel level: %.1f%%", 
-			telemetry.CarID, telemetry.FuelLevel)
 		if telemetry.FuelLevel < 0 {
 			telemetry.FuelLevel = 0
 		}
@@ -70,18 +77,25 @@ func CarTelemetryHandler(client mqtt.Client, msg mqtt.Message) {
 		}
 	}
 
-	log.Printf("📥 [%s] Engine: %.1f°C, Coolant: %.1f°C, Throttle: %.2f, Fuel: %.1f%%, Location: (%.4f, %.4f)",
+	log.Printf("[%s] Engine: %.1f°C, Fuel: %.1f%%, Location: (%.4f, %.4f)",
 		telemetry.CarID,
 		telemetry.EngineTemperature,
-		telemetry.EngineCoolantTemp,
-		telemetry.GasThrottle,
 		telemetry.FuelLevel,
 		telemetry.Latitude,
 		telemetry.Longitude)
 
+	if historySaver != nil {
+		if err := historySaver.SaveTelemetry(
+			telemetry.CarID,
+			telemetry.FuelLevel,
+			telemetry.Latitude,
+			telemetry.Longitude,
+		); err != nil {
+			log.Printf("Failed to save history for %s: %v", telemetry.CarID, err)
+		}
+	}
+
 	if broadcaster != nil {
 		broadcaster.BroadcastTelemetry(telemetry)
-	} else {
-		log.Printf("⚠️ Broadcaster nije postavljen, telemetrija se ne emituje!")
 	}
 }
