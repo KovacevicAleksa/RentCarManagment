@@ -3,6 +3,7 @@ import CarDetailsHeader from "./CarDetailsHeader";
 import CarMap from "./CarMap";
 import CarInfoPanel from "./CarInfoPanel";
 import LoadingState from "./LoadingState";
+import CarHistoryCharts from "./CarHistoryCharts";
 
 export default function CarDetails({ carId, onBack }) {
   const { getCar, wsConnected } = useWebSocket();
@@ -20,12 +21,15 @@ export default function CarDetails({ carId, onBack }) {
         {!carData ? (
           <LoadingState carId={carId} />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <CarMap carId={carId} carData={carData} />
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <CarMap carId={carId} carData={carData} />
+              </div>
+              <CarInfoPanel carData={carData} />
             </div>
-            <CarInfoPanel carData={carData} />
-          </div>
+            <CarHistoryCharts carId={carId} />
+          </>
         )}
       </main>
     </div>
