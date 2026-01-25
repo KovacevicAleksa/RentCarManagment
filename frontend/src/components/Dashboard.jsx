@@ -148,7 +148,7 @@ export default function Dashboard({ onLogout }) {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Fleet Dashboard
+              Kontrolna tabla voznog parka
             </h2>
             <p className="text-gray-600">
               Praćenje vozila u realnom vremenu ({Object.keys(cars).length}{" "}

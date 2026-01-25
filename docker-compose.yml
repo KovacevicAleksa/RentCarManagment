@@ -108,6 +108,20 @@ services:
       mosquitto:
         condition: service_healthy
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rentcar-frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8010}
+    depends_on:
+      - backend
+    stdin_open: true
+    tty: true
+
 volumes:
   postgres-data:
   timescale-data:
