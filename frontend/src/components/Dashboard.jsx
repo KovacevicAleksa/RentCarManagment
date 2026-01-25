@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Car, Gauge, Thermometer, Droplet, MapPin } from "lucide-react";
+import { Car, Gauge, Thermometer, Droplet, MapPin, Map } from "lucide-react";
 import { useWebSocket } from "../contexts/WebSocketContext";
 import CarDetails from "./car-details/CarDetails";
+import FleetMap from "./fleet-map/FleetMap";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
 
@@ -12,6 +13,7 @@ export default function Dashboard({ onLogout }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedCar, setSelectedCar] = useState(null);
+  const [showFleetMap, setShowFleetMap] = useState(false);
 
   useEffect(() => {
     fetchUserInfo();
@@ -143,14 +145,26 @@ export default function Dashboard({ onLogout }) {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">
-            Fleet Dashboard
-          </h2>
-          <p className="text-gray-600">
-            Praćenje vozila u realnom vremenu ({Object.keys(cars).length}{" "}
-            aktivnih)
-          </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Fleet Dashboard
+            </h2>
+            <p className="text-gray-600">
+              Praćenje vozila u realnom vremenu ({Object.keys(cars).length}{" "}
+              aktivnih)
+            </p>
+          </div>
+
+          {Object.keys(cars).length > 0 && (
+            <button
+              onClick={() => setShowFleetMap(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-200 font-medium"
+            >
+              <Map className="w-5 h-5" />
+              Prikaži sve na mapi
+            </button>
+          )}
         </div>
 
         {error && (
@@ -335,6 +349,11 @@ export default function Dashboard({ onLogout }) {
           </div>
         )}
       </main>
+
+      {/* Fleet Map Modal */}
+      {showFleetMap && (
+        <FleetMap cars={cars} onClose={() => setShowFleetMap(false)} />
+      )}
     </div>
   );
 }
