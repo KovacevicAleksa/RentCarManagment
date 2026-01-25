@@ -1,9 +1,20 @@
 package auth
 
-import "gorm.io/gorm"
+import (
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 type User struct {
-	gorm.Model
+	ID       string `gorm:"type:uuid;primaryKey"`
 	Email    string `gorm:"uniqueIndex"`
 	Password string
+	gorm.Model `gorm:"embedded;embeddedPrefix:meta_"`
+}
+
+func (u *User) BeforeCreate(tx *gorm.DB) error {
+	if u.ID == "" {
+		u.ID = uuid.Must(uuid.NewV7()).String()
+	}
+	return nil
 }

@@ -36,14 +36,14 @@ func (s *AuthService) Register(email, password string) error {
 	return s.repo.CreateUser(user)
 }
 
-func (s *AuthService) Login(email, password string) (string, uint, error) {
+func (s *AuthService) Login(email, password string) (string, string, error) {
 	user, err := s.repo.FindByEmail(email)
 	if err != nil || user == nil {
-		return "", 0, errors.New("invalid email or password")
+		return "", "", errors.New("invalid email or password")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		return "", 0, errors.New("invalid email or password")
+		return "", "", errors.New("invalid email or password")
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -54,12 +54,12 @@ func (s *AuthService) Login(email, password string) (string, uint, error) {
 
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		return "", 0, errors.New("JWT_SECRET not set")
+		return "", "", errors.New("JWT_SECRET not set")
 	}
 
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
-		return "", 0, err
+		return "", "", err
 	}
 
 	return tokenString, user.ID, nil

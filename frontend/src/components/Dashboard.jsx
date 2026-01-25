@@ -1,13 +1,17 @@
 import { useState, useEffect } from "react";
-import { Car } from "lucide-react";
+import { Car, Gauge, Thermometer, Droplet, MapPin } from "lucide-react";
+import { useWebSocket } from "../contexts/WebSocketContext";
+import CarDetails from "./car-details/CarDetails";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
 
 export default function Dashboard({ onLogout }) {
+  const { cars, wsConnected } = useWebSocket();
   const [userInfo, setUserInfo] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedCar, setSelectedCar] = useState(null);
 
   useEffect(() => {
     fetchUserInfo();
@@ -50,6 +54,17 @@ export default function Dashboard({ onLogout }) {
     return email.charAt(0).toUpperCase();
   };
 
+  const formatTimestamp = (timestamp) => {
+    return new Date(timestamp).toLocaleTimeString("sr-RS");
+  };
+
+  // Ako je vozilo selektovano, prikaži CarDetails komponentu
+  if (selectedCar) {
+    return (
+      <CarDetails carId={selectedCar} onBack={() => setSelectedCar(null)} />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <header className="bg-white shadow-md">
@@ -60,6 +75,16 @@ export default function Dashboard({ onLogout }) {
                 <Car className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-xl font-bold text-gray-800">RentCar</h1>
+              <div className="ml-4 flex items-center gap-2">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    wsConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
+                  }`}
+                />
+                <span className="text-xs text-gray-600">
+                  {wsConnected ? "Live" : "Offline"}
+                </span>
+              </div>
             </div>
 
             <div className="relative">
@@ -118,40 +143,197 @@ export default function Dashboard({ onLogout }) {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-3xl shadow-xl p-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Dobrodošli!</h2>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            Fleet Dashboard
+          </h2>
           <p className="text-gray-600">
-            Uspešno ste se prijavili u RentCar sistem.
+            Praćenje vozila u realnom vremenu ({Object.keys(cars).length}{" "}
+            aktivnih)
           </p>
+        </div>
 
-          {error && (
-            <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-xl border border-red-200">
-              {error}
-            </div>
-          )}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-xl border border-red-200">
+            {error}
+          </div>
+        )}
 
-          {userInfo && (
-            <div className="mt-6 p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                Vaše informacije
-              </h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Email:</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {userInfo.email}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Object.values(cars).map((car) => (
+            <div
+              key={car.car_id}
+              onClick={() => setSelectedCar(car.car_id)}
+              className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all cursor-pointer transform hover:scale-105 duration-200"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-md">
+                    <Car className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800">
+                      {car.car_id}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {formatTimestamp(car.timestamp)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div
+                  className={`flex items-center justify-between p-3 rounded-lg ${
+                    car.engine_temperature >= 100
+                      ? "bg-red-50"
+                      : car.engine_temperature >= 90
+                        ? "bg-yellow-50"
+                        : "bg-green-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Thermometer
+                      className={`w-4 h-4 ${
+                        car.engine_temperature >= 100
+                          ? "text-red-600"
+                          : car.engine_temperature >= 90
+                            ? "text-yellow-600"
+                            : "text-green-600"
+                      }`}
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Motor
+                    </span>
+                  </div>
+                  <span
+                    className={`text-sm font-bold ${
+                      car.engine_temperature >= 100
+                        ? "text-red-600"
+                        : car.engine_temperature >= 90
+                          ? "text-yellow-600"
+                          : "text-green-600"
+                    }`}
+                  >
+                    {car.engine_temperature.toFixed(1)}°C
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Korisnički ID:</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {userInfo.user_id}
+
+                <div
+                  className={`flex items-center justify-between p-3 rounded-lg ${
+                    car.engine_coolant_temp >= 95
+                      ? "bg-red-50"
+                      : car.engine_coolant_temp >= 85
+                        ? "bg-yellow-50"
+                        : "bg-green-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Droplet
+                      className={`w-4 h-4 ${
+                        car.engine_coolant_temp >= 95
+                          ? "text-red-600"
+                          : car.engine_coolant_temp >= 85
+                            ? "text-yellow-600"
+                            : "text-green-600"
+                      }`}
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Rashladna
+                    </span>
+                  </div>
+                  <span
+                    className={`text-sm font-bold ${
+                      car.engine_coolant_temp >= 95
+                        ? "text-red-600"
+                        : car.engine_coolant_temp >= 85
+                          ? "text-yellow-600"
+                          : "text-green-600"
+                    }`}
+                  >
+                    {car.engine_coolant_temp.toFixed(1)}°C
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Gauge className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-gray-700">
+                      Gas
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold text-blue-600">
+                    {(car.gas_throttle * 100).toFixed(0)}%
+                  </span>
+                </div>
+
+                <div
+                  className={`flex items-center justify-between p-3 rounded-lg ${
+                    car.fuel_level <= 15
+                      ? "bg-red-50"
+                      : car.fuel_level <= 30
+                        ? "bg-yellow-50"
+                        : "bg-green-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Droplet
+                      className={`w-4 h-4 ${
+                        car.fuel_level <= 15
+                          ? "text-red-600"
+                          : car.fuel_level <= 30
+                            ? "text-yellow-600"
+                            : "text-green-600"
+                      }`}
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Gorivo
+                    </span>
+                  </div>
+                  <span
+                    className={`text-sm font-bold ${
+                      car.fuel_level <= 15
+                        ? "text-red-600"
+                        : car.fuel_level <= 30
+                          ? "text-yellow-600"
+                          : "text-green-600"
+                    }`}
+                  >
+                    {car.fuel_level.toFixed(1)}%
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-purple-600" />
+                    <span className="text-sm font-medium text-gray-700">
+                      Lokacija
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-purple-600">
+                    {car.latitude.toFixed(4)}, {car.longitude.toFixed(4)}
                   </span>
                 </div>
               </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-xs text-center text-gray-500">
+                  Klikni za detaljne informacije
+                </p>
+              </div>
             </div>
-          )}
+          ))}
         </div>
+
+        {Object.keys(cars).length === 0 && (
+          <div className="bg-white rounded-3xl shadow-xl p-12 text-center">
+            <Car className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-800 mb-2">
+              Nema aktivnih vozila
+            </h3>
+            <p className="text-gray-600">Čekanje telemetrijskih podataka...</p>
+          </div>
+        )}
       </main>
     </div>
   );

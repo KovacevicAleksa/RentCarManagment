@@ -11,6 +11,7 @@ import (
 	"github.com/KovacevicAleksa/rentcar/backend/internal/auth"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/db"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/mqtt"
+	"github.com/KovacevicAleksa/rentcar/backend/internal/websocket"
 )
 
 func main() {
@@ -41,12 +42,20 @@ func main() {
 	authService := auth.NewAuthService(authRepo)
 	auth.RegisterRoutes(r, authService)
 
-	// MQTT setup
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+
+	r.GET("/ws", func(c *gin.Context) {
+		websocket.ServeWs(wsHub, c)
+	})
+
+	mqtt.SetBroadcaster(wsHub)
+
 	mqttClient := mqtt.NewClient()
 	mqttService := mqtt.NewService(mqttClient)
 
 	topics := map[string]mqtt.MessageHandler{
-		"car/telemetry": mqtt.CarTelemetryHandler,
+		"car/+/telemetry": mqtt.CarTelemetryHandler,
 	}
 
 	if err := mqttService.Start(topics); err != nil {

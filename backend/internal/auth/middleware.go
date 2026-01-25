@@ -38,8 +38,9 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			if userIDFloat, ok := claims["user_id"].(float64); ok {
-				c.Set("user_id", uint(userIDFloat))
+			// PROMENA: user_id je sada string (UUID), ne float64
+			if userID, ok := claims["user_id"].(string); ok {
+				c.Set("user_id", userID)  // String umesto uint
 			}
 			if email, ok := claims["email"].(string); ok {
 				c.Set("email", email)

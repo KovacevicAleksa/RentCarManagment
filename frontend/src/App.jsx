@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import Dashboard from "./components/Dashboard";
+import { WebSocketProvider } from "./contexts/WebSocketContext";
 import { Car } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
@@ -47,7 +48,11 @@ function App() {
   }
 
   if (isAuthenticated) {
-    return <Dashboard onLogout={handleLogout} />;
+    return (
+      <WebSocketProvider apiUrl={API_URL}>
+        <Dashboard onLogout={handleLogout} />
+      </WebSocketProvider>
+    );
   }
 
   return (
