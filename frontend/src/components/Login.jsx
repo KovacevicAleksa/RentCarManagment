@@ -89,16 +89,6 @@ export default function Login({ onLoginSuccess }) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-sm">
-        <label className="flex items-center">
-          <input type="checkbox" className="mr-2 rounded" />
-          <span className="text-gray-600">Zapamti me</span>
-        </label>
-        <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">
-          Zaboravili ste lozinku?
-        </a>
-      </div>
-
       <button
         onClick={handleLogin}
         disabled={loading || !email || !password}
