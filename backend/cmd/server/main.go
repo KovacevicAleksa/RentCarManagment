@@ -55,8 +55,12 @@ func main() {
 	if err := db.ConvertToHypertable(timescaleConn, "car_histories", "timestamp"); err != nil {
 		log.Printf("Hypertable error: %v", err)
 	} else {
-		db.CreateCompressionPolicy(timescaleConn, "car_histories", "7 days")
-		db.CreateRetentionPolicy(timescaleConn, "car_histories", "90 days")
+		if err := db.CreateCompressionPolicy(timescaleConn, "car_histories", "7 days"); err != nil {
+			log.Printf("CompressionPolicy error: %v", err)
+		}
+		if err := db.CreateRetentionPolicy(timescaleConn, "car_histories", "90 days"); err != nil {
+			log.Printf("RetentionPolicy error: %v", err)
+		}
 	}
 
 	authRepo := auth.NewAuthRepository(postgresConn)
@@ -89,5 +93,7 @@ func main() {
 	}
 
 	log.Println("Server starting on :8010")
-	r.Run(":8010")
+	if err := r.Run(":8010"); err != nil {
+		log.Fatal("Server failed:", err)
+	}
 }

@@ -52,7 +52,9 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 }
 
 func TestLogin_Success(t *testing.T) {
-	os.Setenv("JWT_SECRET", "test-secret-key")
+	if err := os.Setenv("JWT_SECRET", "test-secret-key"); err != nil {
+		t.Fatal(err)
+	}
 	svc := NewAuthService(newMockAuthRepo())
 
 	_ = svc.Register("user@example.com", "secret123")
@@ -70,7 +72,9 @@ func TestLogin_Success(t *testing.T) {
 }
 
 func TestLogin_WrongPassword(t *testing.T) {
-	os.Setenv("JWT_SECRET", "test-secret-key")
+	if err := os.Setenv("JWT_SECRET", "test-secret-key"); err != nil {
+		t.Fatal(err)
+	}
 	svc := NewAuthService(newMockAuthRepo())
 
 	_ = svc.Register("user@example.com", "secret123")
