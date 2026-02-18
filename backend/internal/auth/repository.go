@@ -2,6 +2,11 @@ package auth
 
 import "gorm.io/gorm"
 
+type AuthRepo interface {
+	FindByEmail(email string) (*User, error)
+	CreateUser(user *User) error
+}
+
 type AuthRepository struct {
 	db *gorm.DB
 }

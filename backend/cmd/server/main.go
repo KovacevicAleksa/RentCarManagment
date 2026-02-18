@@ -7,10 +7,12 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/KovacevicAleksa/rentcar/backend/internal/auth"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/db"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/history"
+	"github.com/KovacevicAleksa/rentcar/backend/internal/monitoring"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/mqtt"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/websocket"
 )
@@ -22,6 +24,9 @@ func main() {
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
+
+	r.Use(monitoring.PrometheusMiddleware())
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},

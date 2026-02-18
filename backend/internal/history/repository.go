@@ -6,6 +6,14 @@ import (
 	"gorm.io/gorm"
 )
 
+type HistoryRepo interface {
+	Create(h *CarHistory) error
+	FindByCarID(carID string, limit int) ([]CarHistory, error)
+	FindByCarIDAndTimeRange(carID string, start, end time.Time) ([]CarHistory, error)
+	GetLatestByCarID(carID string) (*CarHistory, error)
+	DeleteOlderThan(days int) error
+}
+
 type HistoryRepository struct {
 	db *gorm.DB
 }

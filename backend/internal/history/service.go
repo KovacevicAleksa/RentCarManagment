@@ -6,10 +6,10 @@ import (
 )
 
 type HistoryService struct {
-	repo *HistoryRepository
+	repo HistoryRepo
 }
 
-func NewHistoryService(repo *HistoryRepository) *HistoryService {
+func NewHistoryService(repo HistoryRepo) *HistoryService {
 	return &HistoryService{repo: repo}
 }
 
