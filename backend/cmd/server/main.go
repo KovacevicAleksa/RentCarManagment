@@ -7,10 +7,12 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/KovacevicAleksa/rentcar/backend/internal/auth"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/db"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/history"
+	"github.com/KovacevicAleksa/rentcar/backend/internal/monitoring"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/mqtt"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/websocket"
 )
@@ -22,6 +24,9 @@ func main() {
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
+
+	r.Use(monitoring.PrometheusMiddleware())
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
@@ -50,8 +55,12 @@ func main() {
 	if err := db.ConvertToHypertable(timescaleConn, "car_histories", "timestamp"); err != nil {
 		log.Printf("Hypertable error: %v", err)
 	} else {
-		db.CreateCompressionPolicy(timescaleConn, "car_histories", "7 days")
-		db.CreateRetentionPolicy(timescaleConn, "car_histories", "90 days")
+		if err := db.CreateCompressionPolicy(timescaleConn, "car_histories", "7 days"); err != nil {
+			log.Printf("CompressionPolicy error: %v", err)
+		}
+		if err := db.CreateRetentionPolicy(timescaleConn, "car_histories", "90 days"); err != nil {
+			log.Printf("RetentionPolicy error: %v", err)
+		}
 	}
 
 	authRepo := auth.NewAuthRepository(postgresConn)
@@ -84,5 +93,7 @@ func main() {
 	}
 
 	log.Println("Server starting on :8010")
-	r.Run(":8010")
+	if err := r.Run(":8010"); err != nil {
+		log.Fatal("Server failed:", err)
+	}
 }
