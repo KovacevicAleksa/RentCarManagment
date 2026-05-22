@@ -8,6 +8,7 @@ import (
 
 type HistoryRepo interface {
 	Create(h *CarHistory) error
+	CreateBatch(items []*CarHistory) error
 	FindByCarID(carID string, limit int) ([]CarHistory, error)
 	FindByCarIDAndTimeRange(carID string, start, end time.Time) ([]CarHistory, error)
 	GetLatestByCarID(carID string) (*CarHistory, error)
@@ -24,6 +25,13 @@ func NewHistoryRepository(db *gorm.DB) *HistoryRepository {
 
 func (r *HistoryRepository) Create(history *CarHistory) error {
 	return r.db.Create(history).Error
+}
+
+func (r *HistoryRepository) CreateBatch(items []*CarHistory) error {
+	if len(items) == 0 {
+		return nil
+	}
+	return r.db.CreateInBatches(items, 500).Error
 }
 
 func (r *HistoryRepository) FindByCarID(carID string, limit int) ([]CarHistory, error) {

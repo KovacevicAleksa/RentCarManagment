@@ -11,6 +11,8 @@ import {
 } from "recharts";
 import { Activity, BarChart3 } from "lucide-react";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
+
 export default function CarHistoryCharts({ carId }) {
   const [historyData, setHistoryData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +22,7 @@ export default function CarHistoryCharts({ carId }) {
     const fetchHistory = async () => {
       try {
         const response = await fetch(
-          `http://localhost:8010/history/car/${carId}?limit=50`,
+          `${API_URL}/history/car/${carId}?limit=50`,
           {
             credentials: "include",
           },

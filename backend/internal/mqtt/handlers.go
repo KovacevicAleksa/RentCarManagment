@@ -6,6 +6,8 @@ import (
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+
+	"github.com/KovacevicAleksa/rentcar/backend/internal/monitoring"
 )
 
 type CarTelemetry struct {
@@ -59,6 +61,8 @@ func CarTelemetryHandler(client mqtt.Client, msg mqtt.Message) {
 		return
 	}
 
+	monitoring.CarTelemetryTotal.WithLabelValues(telemetry.CarID).Inc()
+
 	if telemetry.Timestamp.IsZero() {
 		telemetry.Timestamp = time.Now()
 	}
@@ -76,13 +80,6 @@ func CarTelemetryHandler(client mqtt.Client, msg mqtt.Message) {
 			telemetry.FuelLevel = 100
 		}
 	}
-
-	log.Printf("[%s] Engine: %.1f°C, Fuel: %.1f%%, Location: (%.4f, %.4f)",
-		telemetry.CarID,
-		telemetry.EngineTemperature,
-		telemetry.FuelLevel,
-		telemetry.Latitude,
-		telemetry.Longitude)
 
 	if historySaver != nil {
 		if err := historySaver.SaveTelemetry(

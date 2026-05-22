@@ -157,23 +157,19 @@ func main() {
 	
 	log.Println("✅ Car fleet service connected to MQTT broker")
 	
-	cars := []struct {
-		id  string
-		lat float64
-		lon float64
-	}{
-		{"CAR001", 44.7866, 20.4489},
-		{"CAR002", 44.8125, 20.4612},
-		{"CAR003", 44.8023, 20.4781},
-		{"CAR004", 44.7689, 20.4567},
-		{"CAR005", 44.8234, 20.4423},
-	}
-	
+	const numCars = 10000
+	const centerLat = 44.7866
+	const centerLon = 20.4489
+	const spread = 0.05
+
 	var wg sync.WaitGroup
-	
-	for _, car := range cars {
+
+	for i := 1; i <= numCars; i++ {
+		id := fmt.Sprintf("CAR%03d", i)
+		lat := centerLat + (rand.Float64()-0.5)*spread*2
+		lon := centerLon + (rand.Float64()-0.5)*spread*2
 		wg.Add(1)
-		go simulateCar(client, car.id, car.lat, car.lon, &wg)
+		go simulateCar(client, id, lat, lon, &wg)
 	}
 	
 	wg.Wait()

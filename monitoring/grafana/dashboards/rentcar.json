@@ -62,6 +62,54 @@
       "fieldConfig": {
         "defaults": { "unit": "s" }
       }
+    },
+    {
+      "id": 4,
+      "title": "Car Telemetry Rate (total req/s from all cars)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(rentcar_car_telemetry_total[1m]))",
+          "legendFormat": "total req/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "color": { "fixedColor": "green", "mode": "fixed" } }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Active Cars Sending Telemetry (last 1m)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 16, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "count(rate(rentcar_car_telemetry_total[1m]) > 0)",
+          "legendFormat": "active cars",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "fixedColor": "blue", "mode": "fixed" } }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Car Telemetry Rate per Car",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 16, "w": 16, "h": 6 },
+      "targets": [
+        {
+          "expr": "rate(rentcar_car_telemetry_total[1m])",
+          "legendFormat": "{{car_id}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" }
+      }
     }
   ],
   "time": { "from": "now-1h", "to": "now" }

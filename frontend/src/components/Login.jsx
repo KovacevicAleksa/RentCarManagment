@@ -25,7 +25,7 @@ export default function Login({ onLoginSuccess }) {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Prijava neuspešna");
+        setMessage(data.error || data.message || "Prijava neuspešna");
         setLoading(false);
         return;
       }
