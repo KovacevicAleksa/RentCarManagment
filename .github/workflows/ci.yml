@@ -4,11 +4,12 @@ on:
   pull_request:
     branches:
       - develop
+  workflow_dispatch:
 
 jobs:
   test-backend:
     name: Test Backend
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     defaults:
       run:
         working-directory: backend
@@ -28,7 +29,7 @@ jobs:
 
   build-backend:
     name: Build Backend
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: test-backend
     defaults:
       run:
@@ -49,7 +50,7 @@ jobs:
 
   lint-backend:
     name: Lint Backend
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     defaults:
       run:
         working-directory: backend

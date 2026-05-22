@@ -27,6 +27,13 @@ var (
 		[]string{"method", "path"},
 	)
 
+	CarTelemetryTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "rentcar_car_telemetry_total",
+			Help: "Total number of telemetry messages received from cars via MQTT.",
+		},
+		[]string{"car_id"},
+	)
 )
 
 func PrometheusMiddleware() gin.HandlerFunc {

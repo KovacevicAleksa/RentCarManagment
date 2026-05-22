@@ -71,7 +71,6 @@ func (h *Hub) BroadcastTelemetry(data interface{}) {
 	
 	select {
 	case h.broadcast <- jsonData:
-		log.Printf("📤 Broadcasted telemetry to %d clients", len(h.clients))
 	default:
 		log.Printf("⚠️ Broadcast channel full, dropping message")
 	}

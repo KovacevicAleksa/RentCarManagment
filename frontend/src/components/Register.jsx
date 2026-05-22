@@ -31,7 +31,7 @@ export default function Register() {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Registracija neuspešna");
+        setMessage(data.error || data.message || "Registracija neuspešna");
         setLoading(false);
         return;
       }

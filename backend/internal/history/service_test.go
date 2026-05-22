@@ -15,6 +15,13 @@ func (m *mockHistoryRepo) Create(h *CarHistory) error {
 	return nil
 }
 
+func (m *mockHistoryRepo) CreateBatch(items []*CarHistory) error {
+	for _, h := range items {
+		m.records = append(m.records, *h)
+	}
+	return nil
+}
+
 func (m *mockHistoryRepo) FindByCarID(carID string, limit int) ([]CarHistory, error) {
 	var result []CarHistory
 	for _, r := range m.records {
@@ -66,9 +73,15 @@ func TestSaveTelemetry_Success(t *testing.T) {
 	if err := svc.SaveTelemetry("CAR001", 75.5, 44.8, 20.4); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(repo.records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(repo.records))
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(repo.records) == 1 {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
+	t.Fatalf("expected 1 record, got %d", len(repo.records))
 }
 
 func TestGetRecentHistory_LimitClampedToDefault(t *testing.T) {

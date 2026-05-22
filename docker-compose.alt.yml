@@ -1,0 +1,203 @@
+name: rentcar-alt
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: rentcar-alt-mosquitto
+    restart: always
+    ports:
+      - "31883:1883"
+    command: >
+      sh -c "
+      mkdir -p /mosquitto/config /mosquitto/data /mosquitto/log &&
+      echo 'listener 1883' > /mosquitto/config/mosquitto.conf &&
+      echo 'allow_anonymous true' >> /mosquitto/config/mosquitto.conf &&
+      echo 'persistence true' >> /mosquitto/config/mosquitto.conf &&
+      echo 'persistence_location /mosquitto/data/' >> /mosquitto/config/mosquitto.conf &&
+      echo 'log_dest stdout' >> /mosquitto/config/mosquitto.conf &&
+      /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 mosquitto_sub -t '$$SYS/#' -C 1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - rentcar-alt-net
+
+  postgres:
+    image: postgres:18
+    container_name: rentcar-alt-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "35434:5432"
+    volumes:
+      - postgres-data-alt:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+    networks:
+      - rentcar-alt-net
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg18
+    container_name: rentcar-alt-timescaledb
+    restart: always
+    environment:
+      POSTGRES_USER: ${TIMESCALE_USER:-timeuser}
+      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD:-timepass}
+      POSTGRES_DB: ${TIMESCALE_DB:-timedb}
+    ports:
+      - "35433:5432"
+    volumes:
+      - timescale-data-alt:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${TIMESCALE_USER:-timeuser} -d ${TIMESCALE_DB:-timedb}",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+    networks:
+      - rentcar-alt-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rentcar-alt-backend
+    ports:
+      - "38010:8010"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: 5432
+      TIMESCALE_USER: ${TIMESCALE_USER:-timeuser}
+      TIMESCALE_PASSWORD: ${TIMESCALE_PASSWORD:-timepass}
+      TIMESCALE_DB: ${TIMESCALE_DB:-timedb}
+      MQTT_BROKER: tcp://mosquitto:1883
+      BACKEND_PORT: 8010
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_ORIGIN: http://localhost:35173
+    depends_on:
+      postgres:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    networks:
+      - rentcar-alt-net
+
+  car:
+    build:
+      context: ./car
+      dockerfile: Dockerfile
+    container_name: rentcar-alt-car
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      MQTT_BROKER: tcp://mosquitto:1883
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    networks:
+      - rentcar-alt-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rentcar-alt-frontend
+    ports:
+      - "35173:5173"
+    environment:
+      VITE_API_URL: http://localhost:38010
+    depends_on:
+      - backend
+    stdin_open: true
+    tty: true
+    networks:
+      - rentcar-alt-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: rentcar-alt-prometheus
+    restart: always
+    ports:
+      - "39090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data-alt:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+    depends_on:
+      - backend
+    networks:
+      - rentcar-alt-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rentcar-alt-grafana
+    restart: always
+    ports:
+      - "33000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data-alt:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - rentcar-alt-net
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: rentcar-alt-node-exporter
+    restart: always
+    ports:
+      - "39100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    networks:
+      - rentcar-alt-net
+
+networks:
+  rentcar-alt-net:
+    name: rentcar-alt-net
+    driver: bridge
+
+volumes:
+  postgres-data-alt:
+  timescale-data-alt:
+  prometheus-data-alt:
+  grafana-data-alt:
