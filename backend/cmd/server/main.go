@@ -40,7 +40,7 @@ func main() {
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     origins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
@@ -73,13 +73,24 @@ func main() {
 		}
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET not set")
+	}
+	tokenService := auth.NewTokenService(jwtSecret, 72*time.Hour)
+
 	authRepo := auth.NewAuthRepository(postgresConn)
-	authService := auth.NewAuthService(authRepo)
-	auth.RegisterRoutes(r, authService)
+	authService := auth.NewAuthService(authRepo, tokenService)
+
+	if err := authService.EnsureAdmin(os.Getenv("ADMIN_EMAIL"), os.Getenv("ADMIN_PASSWORD")); err != nil {
+		log.Printf("Failed to seed admin user: %v", err)
+	}
+
+	auth.RegisterRoutes(r, authService, tokenService)
 
 	historyRepo := history.NewHistoryRepository(timescaleConn)
 	historyService := history.NewHistoryService(historyRepo)
-	history.RegisterRoutes(r, historyService)
+	history.RegisterRoutes(r, historyService, tokenService)
 
 	wsHub := websocket.NewHub()
 	go wsHub.Run()

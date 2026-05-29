@@ -7,4 +7,7 @@ export default defineConfig({
   server: {
     allowedHosts: ["rentcar-app-bdcqacg7g7bag9fc.germanywestcentral-01.azurewebsites.net"],
   },
+  test: {
+    environment: "node",
+  },
 });

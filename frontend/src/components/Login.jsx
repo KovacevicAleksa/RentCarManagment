@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { parseApiError } from "../lib/api";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
 
@@ -25,7 +26,7 @@ export default function Login({ onLoginSuccess }) {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.error || data.message || "Prijava neuspešna");
+        setMessage(parseApiError(data, "Prijava neuspešna"));
         setLoading(false);
         return;
       }
@@ -36,7 +37,7 @@ export default function Login({ onLoginSuccess }) {
       setTimeout(() => {
         onLoginSuccess();
       }, 500);
-    } catch (err) {
+    } catch {
       setMessage("Greška u mreži");
       setLoading(false);
     }

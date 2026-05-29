@@ -1,8 +1,19 @@
 import { useState, useEffect } from "react";
-import { Car, Gauge, Thermometer, Droplet, MapPin, Map } from "lucide-react";
+import {
+  Car,
+  Gauge,
+  Thermometer,
+  Droplet,
+  MapPin,
+  Map,
+  Settings as SettingsIcon,
+} from "lucide-react";
 import { useWebSocket } from "../contexts/WebSocketContext";
 import CarDetails from "./car-details/CarDetails";
 import FleetMap from "./fleet-map/FleetMap";
+import Settings from "./settings/Settings";
+import { engineTempLevel, coolantLevel, fuelLevel, LEVEL_STYLES } from "../lib/status";
+import { loadPreferences } from "../lib/preferences";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
 
@@ -14,6 +25,8 @@ export default function Dashboard({ onLogout }) {
   const [error, setError] = useState("");
   const [selectedCar, setSelectedCar] = useState(null);
   const [showFleetMap, setShowFleetMap] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [prefs, setPrefs] = useState(loadPreferences);
 
   useEffect(() => {
     fetchUserInfo();
@@ -64,6 +77,19 @@ export default function Dashboard({ onLogout }) {
   if (selectedCar) {
     return (
       <CarDetails carId={selectedCar} onBack={() => setSelectedCar(null)} />
+    );
+  }
+
+  if (showSettings) {
+    return (
+      <Settings
+        userInfo={userInfo}
+        prefs={prefs}
+        onPrefsChange={setPrefs}
+        onProfileChanged={fetchUserInfo}
+        onLogout={handleLogout}
+        onBack={() => setShowSettings(false)}
+      />
     );
   }
 
@@ -131,6 +157,16 @@ export default function Dashboard({ onLogout }) {
 
                   <div className="p-2">
                     <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        setShowSettings(true);
+                      }}
+                      className="w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-all font-medium"
+                    >
+                      <SettingsIcon className="w-4 h-4" />
+                      Podešavanja
+                    </button>
+                    <button
                       onClick={handleLogout}
                       className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-all font-medium"
                     >
@@ -174,7 +210,11 @@ export default function Dashboard({ onLogout }) {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Object.values(cars).map((car) => (
+          {Object.values(cars).map((car) => {
+            const engineLvl = engineTempLevel(car.engine_temperature, prefs);
+            const coolantLvl = coolantLevel(car.engine_coolant_temp, prefs);
+            const fuelLvl = fuelLevel(car.fuel_level, prefs);
+            return (
             <div
               key={car.car_id}
               onClick={() => setSelectedCar(car.car_id)}
@@ -198,73 +238,33 @@ export default function Dashboard({ onLogout }) {
 
               <div className="space-y-3">
                 <div
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    car.engine_temperature >= 100
-                      ? "bg-red-50"
-                      : car.engine_temperature >= 90
-                        ? "bg-yellow-50"
-                        : "bg-green-50"
-                  }`}
+                  className={`flex items-center justify-between p-3 rounded-lg ${LEVEL_STYLES[engineLvl].bg}`}
                 >
                   <div className="flex items-center gap-2">
                     <Thermometer
-                      className={`w-4 h-4 ${
-                        car.engine_temperature >= 100
-                          ? "text-red-600"
-                          : car.engine_temperature >= 90
-                            ? "text-yellow-600"
-                            : "text-green-600"
-                      }`}
+                      className={`w-4 h-4 ${LEVEL_STYLES[engineLvl].icon}`}
                     />
                     <span className="text-sm font-medium text-gray-700">
                       Motor
                     </span>
                   </div>
-                  <span
-                    className={`text-sm font-bold ${
-                      car.engine_temperature >= 100
-                        ? "text-red-600"
-                        : car.engine_temperature >= 90
-                          ? "text-yellow-600"
-                          : "text-green-600"
-                    }`}
-                  >
+                  <span className={`text-sm font-bold ${LEVEL_STYLES[engineLvl].text}`}>
                     {car.engine_temperature.toFixed(1)}°C
                   </span>
                 </div>
 
                 <div
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    car.engine_coolant_temp >= 95
-                      ? "bg-red-50"
-                      : car.engine_coolant_temp >= 85
-                        ? "bg-yellow-50"
-                        : "bg-green-50"
-                  }`}
+                  className={`flex items-center justify-between p-3 rounded-lg ${LEVEL_STYLES[coolantLvl].bg}`}
                 >
                   <div className="flex items-center gap-2">
                     <Droplet
-                      className={`w-4 h-4 ${
-                        car.engine_coolant_temp >= 95
-                          ? "text-red-600"
-                          : car.engine_coolant_temp >= 85
-                            ? "text-yellow-600"
-                            : "text-green-600"
-                      }`}
+                      className={`w-4 h-4 ${LEVEL_STYLES[coolantLvl].icon}`}
                     />
                     <span className="text-sm font-medium text-gray-700">
                       Rashladna
                     </span>
                   </div>
-                  <span
-                    className={`text-sm font-bold ${
-                      car.engine_coolant_temp >= 95
-                        ? "text-red-600"
-                        : car.engine_coolant_temp >= 85
-                          ? "text-yellow-600"
-                          : "text-green-600"
-                    }`}
-                  >
+                  <span className={`text-sm font-bold ${LEVEL_STYLES[coolantLvl].text}`}>
                     {car.engine_coolant_temp.toFixed(1)}°C
                   </span>
                 </div>
@@ -282,37 +282,15 @@ export default function Dashboard({ onLogout }) {
                 </div>
 
                 <div
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    car.fuel_level <= 15
-                      ? "bg-red-50"
-                      : car.fuel_level <= 30
-                        ? "bg-yellow-50"
-                        : "bg-green-50"
-                  }`}
+                  className={`flex items-center justify-between p-3 rounded-lg ${LEVEL_STYLES[fuelLvl].bg}`}
                 >
                   <div className="flex items-center gap-2">
-                    <Droplet
-                      className={`w-4 h-4 ${
-                        car.fuel_level <= 15
-                          ? "text-red-600"
-                          : car.fuel_level <= 30
-                            ? "text-yellow-600"
-                            : "text-green-600"
-                      }`}
-                    />
+                    <Droplet className={`w-4 h-4 ${LEVEL_STYLES[fuelLvl].icon}`} />
                     <span className="text-sm font-medium text-gray-700">
                       Gorivo
                     </span>
                   </div>
-                  <span
-                    className={`text-sm font-bold ${
-                      car.fuel_level <= 15
-                        ? "text-red-600"
-                        : car.fuel_level <= 30
-                          ? "text-yellow-600"
-                          : "text-green-600"
-                    }`}
-                  >
+                  <span className={`text-sm font-bold ${LEVEL_STYLES[fuelLvl].text}`}>
                     {car.fuel_level.toFixed(1)}%
                   </span>
                 </div>
@@ -336,7 +314,8 @@ export default function Dashboard({ onLogout }) {
                 </p>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {Object.keys(cars).length === 0 && (
