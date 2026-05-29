@@ -2,55 +2,42 @@ package auth
 
 import (
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
-func AuthMiddleware() gin.HandlerFunc {
+// AuthMiddleware validates the JWT cookie and stores the user_id, email and
+// role on the request context for downstream handlers.
+func AuthMiddleware(tokens *TokenService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString, err := c.Cookie("token")
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized - no token"})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized - no token"})
 			return
 		}
 
-		secret := os.Getenv("JWT_SECRET")
-		if secret == "" {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server configuration error"})
-			c.Abort()
+		claims, err := tokens.Parse(tokenString)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 			return
 		}
 
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, jwt.ErrSignatureInvalid
-			}
-			return []byte(secret), nil
-		})
+		c.Set("user_id", claims.UserID)
+		c.Set("email", claims.Email)
+		c.Set("role", claims.Role)
+		c.Next()
+	}
+}
 
-		if err != nil || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-			c.Abort()
+// RequireRole aborts with 403 unless the context role (set by AuthMiddleware)
+// matches the required role. Must run after AuthMiddleware.
+func RequireRole(role string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		current, _ := c.Get("role")
+		if current != role {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Forbidden - insufficient permissions"})
 			return
 		}
-
-		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			// PROMENA: user_id je sada string (UUID), ne float64
-			if userID, ok := claims["user_id"].(string); ok {
-				c.Set("user_id", userID)  // String umesto uint
-			}
-			if email, ok := claims["email"].(string); ok {
-				c.Set("email", email)
-			}
-		} else {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
-			c.Abort()
-			return
-		}
-
 		c.Next()
 	}
 }

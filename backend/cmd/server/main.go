@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -23,9 +24,18 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173"
+	}
+	allowedOrigins := []string{frontendURL}
+	if adminURL := os.Getenv("ADMIN_URL"); adminURL != "" {
+		allowedOrigins = append(allowedOrigins, adminURL)
+	}
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowOrigins:     allowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
@@ -54,13 +64,24 @@ func main() {
 		db.CreateRetentionPolicy(timescaleConn, "car_histories", "90 days")
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET not set")
+	}
+	tokenService := auth.NewTokenService(jwtSecret, 72*time.Hour)
+
 	authRepo := auth.NewAuthRepository(postgresConn)
-	authService := auth.NewAuthService(authRepo)
-	auth.RegisterRoutes(r, authService)
+	authService := auth.NewAuthService(authRepo, tokenService)
+
+	if err := authService.EnsureAdmin(os.Getenv("ADMIN_EMAIL"), os.Getenv("ADMIN_PASSWORD")); err != nil {
+		log.Printf("Failed to seed admin user: %v", err)
+	}
+
+	auth.RegisterRoutes(r, authService, tokenService)
 
 	historyRepo := history.NewHistoryRepository(timescaleConn)
 	historyService := history.NewHistoryService(historyRepo)
-	history.RegisterRoutes(r, historyService)
+	history.RegisterRoutes(r, historyService, tokenService)
 
 	wsHub := websocket.NewHub()
 	go wsHub.Run()

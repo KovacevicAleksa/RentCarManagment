@@ -6,19 +6,29 @@ import (
 	"gorm.io/gorm"
 )
 
-type HistoryRepository struct {
+// HistoryRepository abstracts telemetry persistence so the service can be
+// unit-tested against an in-memory stub instead of a real database.
+type HistoryRepository interface {
+	Create(history *CarHistory) error
+	FindByCarID(carID string, limit int) ([]CarHistory, error)
+	FindByCarIDAndTimeRange(carID string, start, end time.Time) ([]CarHistory, error)
+	GetLatestByCarID(carID string) (*CarHistory, error)
+	DeleteOlderThan(days int) error
+}
+
+type gormHistoryRepository struct {
 	db *gorm.DB
 }
 
-func NewHistoryRepository(db *gorm.DB) *HistoryRepository {
-	return &HistoryRepository{db: db}
+func NewHistoryRepository(db *gorm.DB) HistoryRepository {
+	return &gormHistoryRepository{db: db}
 }
 
-func (r *HistoryRepository) Create(history *CarHistory) error {
+func (r *gormHistoryRepository) Create(history *CarHistory) error {
 	return r.db.Create(history).Error
 }
 
-func (r *HistoryRepository) FindByCarID(carID string, limit int) ([]CarHistory, error) {
+func (r *gormHistoryRepository) FindByCarID(carID string, limit int) ([]CarHistory, error) {
 	var records []CarHistory
 	err := r.db.Where("car_id = ?", carID).
 		Order("timestamp DESC").
@@ -27,7 +37,7 @@ func (r *HistoryRepository) FindByCarID(carID string, limit int) ([]CarHistory, 
 	return records, err
 }
 
-func (r *HistoryRepository) FindByCarIDAndTimeRange(carID string, start, end time.Time) ([]CarHistory, error) {
+func (r *gormHistoryRepository) FindByCarIDAndTimeRange(carID string, start, end time.Time) ([]CarHistory, error) {
 	var records []CarHistory
 	err := r.db.Where("car_id = ? AND timestamp BETWEEN ? AND ?", carID, start, end).
 		Order("timestamp ASC").
@@ -35,7 +45,7 @@ func (r *HistoryRepository) FindByCarIDAndTimeRange(carID string, start, end tim
 	return records, err
 }
 
-func (r *HistoryRepository) GetLatestByCarID(carID string) (*CarHistory, error) {
+func (r *gormHistoryRepository) GetLatestByCarID(carID string) (*CarHistory, error) {
 	var record CarHistory
 	err := r.db.Where("car_id = ?", carID).
 		Order("timestamp DESC").
@@ -46,7 +56,7 @@ func (r *HistoryRepository) GetLatestByCarID(carID string) (*CarHistory, error) 
 	return &record, nil
 }
 
-func (r *HistoryRepository) DeleteOlderThan(days int) error {
+func (r *gormHistoryRepository) DeleteOlderThan(days int) error {
 	cutoff := time.Now().AddDate(0, 0, -days)
 	return r.db.Where("timestamp < ?", cutoff).Delete(&CarHistory{}).Error
 }

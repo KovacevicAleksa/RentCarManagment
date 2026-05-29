@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { parseApiError } from "../lib/api";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
 
@@ -31,14 +32,14 @@ export default function Register() {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(data.message || "Registracija neuspešna");
+        setMessage(parseApiError(data, "Registracija neuspešna"));
         setLoading(false);
         return;
       }
 
       setMessage("Uspešno ste se registrovali! Možete se prijaviti.");
       setLoading(false);
-    } catch (err) {
+    } catch {
       setMessage("Greška u mreži");
       setLoading(false);
     }

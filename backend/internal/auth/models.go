@@ -9,6 +9,7 @@ type User struct {
 	ID       string `gorm:"type:uuid;primaryKey"`
 	Email    string `gorm:"uniqueIndex"`
 	Password string
+	Role     string `gorm:"default:user"`
 	gorm.Model `gorm:"embedded;embeddedPrefix:meta_"`
 }
 
