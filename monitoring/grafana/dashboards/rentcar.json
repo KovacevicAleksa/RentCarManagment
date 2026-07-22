@@ -61,8 +61,7 @@
       ],
       "fieldConfig": {
         "defaults": { "unit": "s" }
-      }
-    },
+          },
     {
       "id": 4,
       "title": "Car Telemetry Rate (total req/s from all cars)",

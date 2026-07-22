@@ -12,13 +12,15 @@ import { useWebSocket } from "../contexts/WebSocketContext";
 import CarDetails from "./car-details/CarDetails";
 import FleetMap from "./fleet-map/FleetMap";
 import Settings from "./settings/Settings";
+import NotificationBell from "./notifications/NotificationBell";
+import NotificationsPage from "./notifications/NotificationsPage";
 import { engineTempLevel, coolantLevel, fuelLevel, LEVEL_STYLES } from "../lib/status";
 import { loadPreferences } from "../lib/preferences";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
 
 export default function Dashboard({ onLogout }) {
-  const { cars, wsConnected } = useWebSocket();
+  const { cars, wsConnected, unreadCount, ringKey } = useWebSocket();
   const [userInfo, setUserInfo] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -26,6 +28,7 @@ export default function Dashboard({ onLogout }) {
   const [selectedCar, setSelectedCar] = useState(null);
   const [showFleetMap, setShowFleetMap] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [prefs, setPrefs] = useState(loadPreferences);
 
   useEffect(() => {
@@ -93,6 +96,10 @@ export default function Dashboard({ onLogout }) {
     );
   }
 
+  if (showNotifications) {
+    return <NotificationsPage onBack={() => setShowNotifications(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <header className="bg-white shadow-md">
@@ -115,11 +122,18 @@ export default function Dashboard({ onLogout }) {
               </div>
             </div>
 
-            <div className="relative">
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 transition-all"
-              >
+            <div className="flex items-center gap-2">
+              <NotificationBell
+                count={unreadCount}
+                ringKey={ringKey}
+                onClick={() => setShowNotifications(true)}
+              />
+
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 transition-all"
+                >
                 <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full shadow-md">
                   <span className="text-white font-semibold text-sm">
                     {loading ? "..." : getInitials(userInfo?.email)}
@@ -175,6 +189,7 @@ export default function Dashboard({ onLogout }) {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
         </div>

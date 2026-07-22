@@ -12,10 +12,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/KovacevicAleksa/rentcar/backend/internal/auth"
+	"github.com/KovacevicAleksa/rentcar/backend/internal/carstats"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/db"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/history"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/monitoring"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/mqtt"
+	"github.com/KovacevicAleksa/rentcar/backend/internal/notification"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/websocket"
 )
 
@@ -50,7 +52,7 @@ func main() {
 	postgresConn := db.NewPostgresConnection()
 	timescaleConn := db.NewTimescaleConnection()
 
-	if err := postgresConn.AutoMigrate(&auth.User{}); err != nil {
+	if err := postgresConn.AutoMigrate(&auth.User{}, &notification.Notification{}, &carstats.Stats{}); err != nil {
 		log.Fatal("Failed to migrate Postgres:", err)
 	}
 
@@ -95,12 +97,33 @@ func main() {
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
 
-	r.GET("/ws", func(c *gin.Context) {
+	r.GET("/ws", auth.AuthMiddleware(tokenService), func(c *gin.Context) {
 		websocket.ServeWs(wsHub, c)
 	})
 
+	notificationRepo := notification.NewRepository(postgresConn)
+	notificationService := notification.NewService(notificationRepo, wsHub)
+	notification.RegisterRoutes(r, notificationService, tokenService)
+
+	carStatsRepo := carstats.NewRepository(postgresConn)
+	carStatsService := carstats.NewService(carStatsRepo)
+	if err := carStatsService.Load(); err != nil {
+		log.Printf("Failed to load car stats: %v", err)
+	}
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := carStatsService.Flush(); err != nil {
+				log.Printf("Car stats flush failed: %v", err)
+			}
+		}
+	}()
+
 	mqtt.SetBroadcaster(wsHub)
 	mqtt.SetHistorySaver(historyService)
+	mqtt.SetAlerter(notificationService)
+	mqtt.SetProcessor(carStatsService)
 
 	mqttClient := mqtt.NewClient()
 	mqttService := mqtt.NewService(mqttClient)

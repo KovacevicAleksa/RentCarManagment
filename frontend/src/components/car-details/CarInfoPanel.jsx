@@ -1,4 +1,13 @@
-import { Clock, Activity, Thermometer, Droplet, Gauge } from "lucide-react";
+import {
+  Clock,
+  Activity,
+  Thermometer,
+  Droplet,
+  Gauge,
+  AlertTriangle,
+  CheckCircle,
+  Flame,
+} from "lucide-react";
 
 const formatTimestamp = (timestamp) => {
   return new Date(timestamp).toLocaleString("sr-RS", {
@@ -42,6 +51,28 @@ export default function CarInfoPanel({ carData }) {
           <h3 className="text-lg font-bold text-gray-800">Status motora</h3>
         </div>
         <div className="space-y-3">
+          <div
+            className={`p-3 rounded-lg ${
+              carData.check_engine
+                ? "text-red-600 bg-red-50"
+                : "text-green-600 bg-green-50"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {carData.check_engine ? (
+                  <AlertTriangle className="w-4 h-4" />
+                ) : (
+                  <CheckCircle className="w-4 h-4" />
+                )}
+                <span className="text-sm font-medium">Check Engine</span>
+              </div>
+              <span className="text-lg font-bold">
+                {carData.check_engine ? "Greška" : "OK"}
+              </span>
+            </div>
+          </div>
+
           <div
             className={`p-3 rounded-lg ${getStatusColor(carData.engine_temperature, { warning: 90, danger: 100 })}`}
           >
@@ -92,6 +123,20 @@ export default function CarInfoPanel({ carData }) {
               </div>
               <span className="text-lg font-bold">
                 {carData.fuel_level.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-orange-50 text-orange-600">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  Učestalost pregrevanja
+                </span>
+              </div>
+              <span className="text-lg font-bold">
+                {(carData.overheat_frequency ?? 0).toFixed(4)} /h
               </span>
             </div>
           </div>

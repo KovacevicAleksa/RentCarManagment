@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { ShieldCheck, ShieldAlert, LogOut } from "lucide-react";
 import Login from "./Login";
 import AdminPanel from "./admin/AdminPanel";
+import { WebSocketProvider } from "../contexts/WebSocketContext";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
 
@@ -93,12 +94,15 @@ export default function AdminApp() {
     );
   }
 
-  // Admin → the admin panel
+  // Admin → the admin panel, with a live WebSocket connection so the admin
+  // receives notifications like any other registered user.
   return (
-    <AdminPanel
-      onLogout={handleLogout}
-      userEmail={userInfo.email}
-      currentUserId={userInfo.user_id}
-    />
+    <WebSocketProvider apiUrl={API_URL}>
+      <AdminPanel
+        onLogout={handleLogout}
+        userEmail={userInfo.email}
+        currentUserId={userInfo.user_id}
+      />
+    </WebSocketProvider>
   );
 }
