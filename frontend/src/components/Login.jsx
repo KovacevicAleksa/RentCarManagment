@@ -26,7 +26,11 @@ export default function Login({ onLoginSuccess }) {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage(parseApiError(data, "Prijava neuspešna"));
+        if (res.status === 403) {
+          setMessage("Vaš nalog čeka odobrenje administratora.");
+        } else {
+          setMessage(parseApiError(data, "Prijava neuspešna"));
+        }
         setLoading(false);
         return;
       }

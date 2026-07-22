@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -9,27 +9,29 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Activity, BarChart3 } from "lucide-react";
+import { Activity, BarChart3, Flame, AlertTriangle, ShieldCheck } from "lucide-react";
+import { toChartRows, faultTotal } from "../../lib/events";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
 
+const OVERHEAT_COLOR = "#f97316"; // orange
+const CHECK_ENGINE_COLOR = "#f59e0b"; // amber
+
 export default function CarHistoryCharts({ carId }) {
-  const [historyData, setHistoryData] = useState(null);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchHistory = async () => {
+    const fetchStats = async () => {
       try {
         const response = await fetch(
-          `${API_URL}/history/car/${carId}?limit=50`,
-          {
-            credentials: "include",
-          },
+          `${API_URL}/carstats/car/${carId}/events`,
+          { credentials: "include" },
         );
-        if (!response.ok) throw new Error("Failed to fetch history");
+        if (!response.ok) throw new Error("Neuspešno učitavanje kvarova");
         const data = await response.json();
-        setHistoryData(data);
+        setStats(data);
         setError(null);
         setLoading(false);
       } catch (err) {
@@ -38,8 +40,8 @@ export default function CarHistoryCharts({ carId }) {
       }
     };
 
-    fetchHistory();
-    const interval = setInterval(fetchHistory, 30000);
+    fetchStats();
+    const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
   }, [carId]);
 
@@ -48,9 +50,9 @@ export default function CarHistoryCharts({ carId }) {
       <div className="mt-8 bg-white rounded-3xl shadow-xl p-12 text-center">
         <Activity className="w-16 h-16 text-gray-400 mx-auto mb-4 animate-pulse" />
         <h3 className="text-xl font-bold text-gray-800 mb-2">
-          Učitavanje istorije...
+          Učitavanje istorije kvarova...
         </h3>
-        <p className="text-gray-600">Preuzimanje telemetrijskih podataka</p>
+        <p className="text-gray-600">Preuzimanje podataka o pregrevanju i check engine</p>
       </div>
     );
   }
@@ -65,166 +67,120 @@ export default function CarHistoryCharts({ carId }) {
     );
   }
 
-  if (
-    !historyData ||
-    !historyData.records ||
-    historyData.records.length === 0
-  ) {
-    return (
-      <div className="mt-8 bg-white rounded-3xl shadow-xl p-12 text-center">
-        <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-gray-800 mb-2">Nema podataka</h3>
-        <p className="text-gray-600">Nema istorijskih podataka za prikaz</p>
-      </div>
-    );
-  }
-
-  const chartData = [...historyData.records].reverse().map((record) => ({
-    fuel: parseFloat(record.fuel?.toFixed(2) || 0),
-    time: new Date(record.timestamp).toLocaleTimeString("sr-RS", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    fullTimestamp: record.timestamp,
-  }));
-
-  const fuelValues = chartData.map((d) => d.fuel);
-  const avgFuelLevel =
-    fuelValues.reduce((a, b) => a + b, 0) / fuelValues.length;
-  const minFuel = Math.min(...fuelValues);
-  const maxFuel = Math.max(...fuelValues);
-  const currentFuel = fuelValues[fuelValues.length - 1];
+  const rows = toChartRows(stats?.buckets);
+  const overheatTotal = stats?.overheat_total ?? 0;
+  const checkEngineTotal = stats?.check_engine_total ?? 0;
+  const windowDays = stats?.window_days ?? 30;
+  const hasFaults = faultTotal(stats) > 0;
 
   return (
     <div className="mt-8 space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <Activity className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">
-              {currentFuel.toFixed(2)}%
-            </span>
-          </div>
-          <p className="text-sm opacity-90">Trenutni nivo</p>
-          <p className="text-xs opacity-75 mt-1">goriva u rezervoaru</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <Activity className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">
-              {avgFuelLevel.toFixed(1)}%
-            </span>
-          </div>
-          <p className="text-sm opacity-90">Prosečan nivo</p>
-          <p className="text-xs opacity-75 mt-1">u periodu praćenja</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-lg p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <BarChart3 className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">{minFuel.toFixed(2)}%</span>
-          </div>
-          <p className="text-sm opacity-90">Minimalni nivo</p>
-          <p className="text-xs opacity-75 mt-1">zabeležen u periodu</p>
-        </div>
-
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-lg p-6 text-white">
           <div className="flex items-center justify-between mb-2">
-            <BarChart3 className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">{historyData.count}</span>
+            <Flame className="w-8 h-8 opacity-80" />
+            <span className="text-2xl font-bold">{overheatTotal}</span>
           </div>
-          <p className="text-sm opacity-90">Ukupno zapisa</p>
-          <p className="text-xs opacity-75 mt-1">telemetrijskih podataka</p>
+          <p className="text-sm opacity-90">Pregrevanja</p>
+          <p className="text-xs opacity-75 mt-1">u poslednjih {windowDays} dana</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl shadow-lg p-6 text-white">
+          <div className="flex items-center justify-between mb-2">
+            <AlertTriangle className="w-8 h-8 opacity-80" />
+            <span className="text-2xl font-bold">{checkEngineTotal}</span>
+          </div>
+          <p className="text-sm opacity-90">Check Engine</p>
+          <p className="text-xs opacity-75 mt-1">u poslednjih {windowDays} dana</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-lg p-6 text-white">
+          <div className="flex items-center justify-between mb-2">
+            <BarChart3 className="w-8 h-8 opacity-80" />
+            <span className="text-2xl font-bold">{faultTotal(stats)}</span>
+          </div>
+          <p className="text-sm opacity-90">Ukupno kvarova</p>
+          <p className="text-xs opacity-75 mt-1">pregrevanje + check engine</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl shadow-lg p-6 text-white">
+          <div className="flex items-center justify-between mb-2">
+            <ShieldCheck className="w-8 h-8 opacity-80" />
+            <span className="text-2xl font-bold">{rows.length}</span>
+          </div>
+          <p className="text-sm opacity-90">Dana sa kvarom</p>
+          <p className="text-xs opacity-75 mt-1">od {windowDays} praćenih</p>
         </div>
       </div>
 
       <div className="bg-white rounded-3xl shadow-xl p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Activity className="w-6 h-6 text-blue-600" />
+          <BarChart3 className="w-6 h-6 text-orange-600" />
           <h3 className="text-xl font-bold text-gray-800">
-            Nivo goriva tokom vremena
+            Kvarovi tokom vremena (poslednjih {windowDays} dana)
           </h3>
         </div>
-        <ResponsiveContainer width="100%" height={400}>
-          <AreaChart data={chartData}>
-            <defs>
-              <linearGradient id="fuelGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis
-              dataKey="time"
-              stroke="#6b7280"
-              tick={{ fontSize: 12 }}
-              interval="preserveStartEnd"
-            />
-            <YAxis
-              stroke="#6b7280"
-              tick={{ fontSize: 12 }}
-              domain={[0, 100]}
-              label={{
-                value: "Gorivo (%)",
-                angle: -90,
-                position: "insideLeft",
-                style: { fontSize: 12 },
-              }}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "rgba(255, 255, 255, 0.95)",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "12px",
-              }}
-              labelStyle={{ fontWeight: "bold", marginBottom: "8px" }}
-            />
-            <Legend wrapperStyle={{ paddingTop: "20px" }} iconType="circle" />
-            <Area
-              type="monotone"
-              dataKey="fuel"
-              stroke="#3b82f6"
-              strokeWidth={3}
-              fill="url(#fuelGradient)"
-              name="Nivo goriva (%)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
 
-      <div className="bg-white rounded-3xl shadow-xl p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <BarChart3 className="w-6 h-6 text-green-600" />
-          <h3 className="text-xl font-bold text-gray-800">Statistika</h3>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-sm text-gray-600 mb-1">Maksimalni nivo</p>
-            <p className="text-2xl font-bold text-gray-800">
-              {maxFuel.toFixed(2)}%
+        {hasFaults ? (
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={rows} barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis
+                dataKey="label"
+                stroke="#6b7280"
+                tick={{ fontSize: 12 }}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                stroke="#6b7280"
+                tick={{ fontSize: 12 }}
+                allowDecimals={false}
+                label={{
+                  value: "Broj epizoda",
+                  angle: -90,
+                  position: "insideLeft",
+                  style: { fontSize: 12 },
+                }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "rgba(255, 255, 255, 0.95)",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "12px",
+                }}
+                labelStyle={{ fontWeight: "bold", marginBottom: "8px" }}
+              />
+              <Legend wrapperStyle={{ paddingTop: "20px" }} iconType="circle" />
+              <Bar
+                dataKey="overheat"
+                fill={OVERHEAT_COLOR}
+                name="Pregrevanje"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={80}
+                isAnimationActive={false}
+              />
+              <Bar
+                dataKey="checkEngine"
+                fill={CHECK_ENGINE_COLOR}
+                name="Check Engine"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={80}
+                isAnimationActive={false}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="py-16 text-center">
+            <ShieldCheck className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+            <h4 className="text-lg font-bold text-gray-800 mb-1">
+              Nema zabeleženih kvarova
+            </h4>
+            <p className="text-gray-600">
+              Nijedno pregrevanje ni check engine u poslednjih {windowDays} dana.
             </p>
           </div>
-          <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-sm text-gray-600 mb-1">Minimalni nivo</p>
-            <p className="text-2xl font-bold text-gray-800">
-              {minFuel.toFixed(2)}%
-            </p>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-sm text-gray-600 mb-1">Raspon</p>
-            <p className="text-2xl font-bold text-gray-800">
-              {(maxFuel - minFuel).toFixed(2)}%
-            </p>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-sm text-gray-600 mb-1">Merenja</p>
-            <p className="text-2xl font-bold text-gray-800">
-              {chartData.length}
-            </p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

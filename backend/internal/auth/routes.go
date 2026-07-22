@@ -18,6 +18,7 @@ func RegisterRoutes(r *gin.Engine, service *AuthService, tokens *TokenService) {
 		adminGroup.POST("/users", AdminCreateUserHandler(service))
 		adminGroup.GET("/users", AdminListUsersHandler(service))
 		adminGroup.POST("/users/:id/reset-password", AdminResetPasswordHandler(service))
+		adminGroup.POST("/users/:id/approve", AdminApproveUserHandler(service))
 		adminGroup.DELETE("/users/:id", AdminDeleteUserHandler(service))
 	}
 }

@@ -11,9 +11,12 @@ import {
   Trash2,
   Bell,
   Send,
+  UserCheck,
+  Clock,
 } from "lucide-react";
 import { validateNewAccount, ROLES } from "../../lib/validation";
 import { parseApiError } from "../../lib/api";
+import { statusLabel, isPending } from "../../lib/accountStatus";
 import { sendNotification } from "../../lib/notifications";
 import { useWebSocket } from "../../contexts/WebSocketContext";
 import NotificationBell from "../notifications/NotificationBell";
@@ -35,6 +38,7 @@ export default function AdminPanel({ onBack, onLogout, userEmail, currentUserId 
   const [resetResult, setResetResult] = useState(null); // { email, password }
   const [resettingId, setResettingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [approvingId, setApprovingId] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
   // "Send notification" form
@@ -80,6 +84,25 @@ export default function AdminPanel({ onBack, onLogout, userEmail, currentUserId 
       setMessage({ type: "error", text: err.message });
     } finally {
       setResettingId(null);
+    }
+  };
+
+  const approveUser = async (u) => {
+    setMessage(null);
+    setApprovingId(u.id);
+    try {
+      const res = await fetch(`${API_URL}/admin/users/${u.id}/approve`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(parseApiError(data, "Odobravanje nije uspelo"));
+      setMessage({ type: "success", text: `Nalog ${u.email} je odobren` });
+      fetchUsers();
+    } catch (err) {
+      setMessage({ type: "error", text: err.message });
+    } finally {
+      setApprovingId(null);
     }
   };
 
@@ -163,6 +186,12 @@ export default function AdminPanel({ onBack, onLogout, userEmail, currentUserId 
     return <NotificationsPage onBack={() => setShowNotifications(false)} />;
   }
 
+  const pendingCount = users.filter((u) => isPending(u.status)).length;
+  // Show pending accounts first so an admin can approve them at a glance.
+  const sortedUsers = [...users].sort(
+    (a, b) => Number(isPending(b.status)) - Number(isPending(a.status)),
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <header className="bg-white shadow-md">
@@ -209,7 +238,7 @@ export default function AdminPanel({ onBack, onLogout, userEmail, currentUserId 
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <section className="bg-white rounded-2xl shadow-lg p-6">
           <div className="flex items-center gap-2 mb-6">
             <UserPlus className="w-5 h-5 text-blue-600" />
@@ -294,6 +323,12 @@ export default function AdminPanel({ onBack, onLogout, userEmail, currentUserId 
             <h2 className="text-lg font-bold text-gray-800">
               Nalozi ({users.length})
             </h2>
+            {pendingCount > 0 && (
+              <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+                <Clock className="w-3.5 h-3.5" />
+                {pendingCount} na čekanju
+              </span>
+            )}
           </div>
 
           {resetResult && (
@@ -325,13 +360,24 @@ export default function AdminPanel({ onBack, onLogout, userEmail, currentUserId 
             <p className="text-gray-500 text-sm">Nema naloga</p>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {users.map((u) => (
+              {sortedUsers.map((u) => (
                 <li
                   key={u.id}
-                  className="flex items-center justify-between gap-3 py-3"
+                  className={`flex items-center justify-between gap-3 py-3 px-2 rounded-lg ${
+                    isPending(u.status) ? "bg-amber-50" : ""
+                  }`}
                 >
                   <span className="text-sm text-gray-700 truncate flex-1">
                     {u.email}
+                  </span>
+                  <span
+                    className={`hidden sm:inline text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      isPending(u.status)
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {statusLabel(u.status)}
                   </span>
                   <span
                     className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
@@ -342,6 +388,17 @@ export default function AdminPanel({ onBack, onLogout, userEmail, currentUserId 
                   >
                     {ROLE_LABELS[u.role] || u.role}
                   </span>
+                  {isPending(u.status) && (
+                    <button
+                      onClick={() => approveUser(u)}
+                      disabled={approvingId === u.id}
+                      title="Odobri nalog"
+                      className="flex items-center gap-1 text-xs text-green-700 hover:text-white hover:bg-green-600 bg-green-100 px-2 py-1 rounded-lg transition-all disabled:opacity-50 font-medium"
+                    >
+                      <UserCheck className="w-3.5 h-3.5" />
+                      {approvingId === u.id ? "..." : "Odobri"}
+                    </button>
+                  )}
                   <button
                     onClick={() => resetPassword(u)}
                     disabled={resettingId === u.id}
@@ -368,7 +425,7 @@ export default function AdminPanel({ onBack, onLogout, userEmail, currentUserId 
           )}
         </section>
 
-        <section className="bg-white rounded-2xl shadow-lg p-6 lg:col-span-2">
+        <section className="bg-white rounded-2xl shadow-lg p-6">
           <div className="flex items-center gap-2 mb-6">
             <Bell className="w-5 h-5 text-blue-600" />
             <h2 className="text-lg font-bold text-gray-800">

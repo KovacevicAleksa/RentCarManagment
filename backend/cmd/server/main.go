@@ -52,7 +52,7 @@ func main() {
 	postgresConn := db.NewPostgresConnection()
 	timescaleConn := db.NewTimescaleConnection()
 
-	if err := postgresConn.AutoMigrate(&auth.User{}, &notification.Notification{}, &carstats.Stats{}); err != nil {
+	if err := postgresConn.AutoMigrate(&auth.User{}, &notification.Notification{}, &carstats.Stats{}, &carstats.Event{}); err != nil {
 		log.Fatal("Failed to migrate Postgres:", err)
 	}
 
@@ -110,6 +110,7 @@ func main() {
 	if err := carStatsService.Load(); err != nil {
 		log.Printf("Failed to load car stats: %v", err)
 	}
+	carstats.RegisterRoutes(r, carStatsService, tokenService)
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()

@@ -18,3 +18,21 @@ type Stats struct {
 // TableName pins the table to car_stats; GORM would otherwise derive the generic
 // name "stats" from the struct.
 func (Stats) TableName() string { return "car_stats" }
+
+// Event types recorded in car_events, one row per fault-episode rising edge.
+const (
+	EventOverheat    = "overheat"
+	EventCheckEngine = "check_engine"
+)
+
+// Event is a single fault-episode occurrence. Rows are the durable source of
+// truth for the trailing-window reliability score, so it survives restarts.
+type Event struct {
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	CarID      string    `gorm:"type:varchar(50);not null;index:idx_car_events_car_time,priority:1" json:"car_id"`
+	Type       string    `gorm:"type:varchar(20);not null" json:"type"`
+	OccurredAt time.Time `gorm:"not null;index:idx_car_events_car_time,priority:2" json:"occurred_at"`
+}
+
+// TableName pins the table to car_events.
+func (Event) TableName() string { return "car_events" }

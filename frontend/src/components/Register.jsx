@@ -37,7 +37,9 @@ export default function Register() {
         return;
       }
 
-      setMessage("Uspešno ste se registrovali! Možete se prijaviti.");
+      setMessage(
+        "Uspešno ste se registrovali! Nalog čeka odobrenje administratora pre prve prijave.",
+      );
       setLoading(false);
     } catch {
       setMessage("Greška u mreži");

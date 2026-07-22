@@ -14,6 +14,7 @@ var (
 	ErrWeakPassword       = errors.New("password must be at least 6 characters")
 	ErrCannotDeleteSelf   = errors.New("cannot delete your own account")
 	ErrLastAdmin          = errors.New("cannot delete the last admin")
+	ErrAccountPending     = errors.New("account is pending admin approval")
 )
 
 const minPasswordLength = 6
@@ -27,14 +28,19 @@ func NewAuthService(repo UserRepository, tokens *TokenService) *AuthService {
 	return &AuthService{repo: repo, tokens: tokens}
 }
 
-// Register self-registers a regular user.
+// Register self-registers a regular user. The account starts pending and
+// cannot log in until an admin approves it.
 func (s *AuthService) Register(email, password string) error {
-	return s.CreateUser(email, password, RoleUser)
+	return s.createUser(email, password, RoleUser, StatusPending)
 }
 
-// CreateUser creates a user with an explicit role. Used by self-registration
-// (role=user) and by admins creating accounts of any role.
+// CreateUser creates a user with an explicit role. Used by admins creating
+// accounts and by startup admin seeding; such accounts are approved on creation.
 func (s *AuthService) CreateUser(email, password, role string) error {
+	return s.createUser(email, password, role, StatusApproved)
+}
+
+func (s *AuthService) createUser(email, password, role, status string) error {
 	if !IsValidRole(role) {
 		return ErrInvalidRole
 	}
@@ -56,6 +62,7 @@ func (s *AuthService) CreateUser(email, password, role string) error {
 		Email:    email,
 		Password: string(hash),
 		Role:     role,
+		Status:   status,
 	})
 }
 
@@ -72,6 +79,10 @@ func (s *AuthService) Login(email, password string) (string, string, error) {
 		return "", "", ErrInvalidCredentials
 	}
 
+	if user.Status != StatusApproved {
+		return "", "", ErrAccountPending
+	}
+
 	token, err := s.tokens.Generate(user.ID, user.Email, user.Role)
 	if err != nil {
 		return "", "", err
@@ -82,6 +93,19 @@ func (s *AuthService) Login(email, password string) (string, string, error) {
 
 func (s *AuthService) ListUsers() ([]User, error) {
 	return s.repo.FindAll()
+}
+
+// ApproveUser marks a pending account as approved so it can log in.
+func (s *AuthService) ApproveUser(id string) error {
+	user, err := s.repo.FindByID(id)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return ErrUserNotFound
+	}
+	user.Status = StatusApproved
+	return s.repo.UpdateUser(user)
 }
 
 // ChangePassword updates a user's password after verifying the current one.

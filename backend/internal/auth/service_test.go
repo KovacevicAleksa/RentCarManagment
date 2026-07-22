@@ -106,6 +106,30 @@ func TestRegisterCreatesUserWithUserRole(t *testing.T) {
 	}
 }
 
+func TestRegisterCreatesPendingUser(t *testing.T) {
+	repo := &stubRepo{}
+	svc := newTestService(repo)
+
+	if err := svc.Register("driver@rentcar.com", "password123"); err != nil {
+		t.Fatalf("Register returned error: %v", err)
+	}
+	if got := repo.users[0].Status; got != StatusPending {
+		t.Errorf("self-registered Status = %q, want %q", got, StatusPending)
+	}
+}
+
+func TestAdminCreateUserIsApproved(t *testing.T) {
+	repo := &stubRepo{}
+	svc := newTestService(repo)
+
+	if err := svc.CreateUser("driver@rentcar.com", "password123", RoleUser); err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+	if got := repo.users[0].Status; got != StatusApproved {
+		t.Errorf("admin-created Status = %q, want %q", got, StatusApproved)
+	}
+}
+
 func TestRegisterRejectsDuplicateEmail(t *testing.T) {
 	repo := &stubRepo{}
 	svc := newTestService(repo)
@@ -153,6 +177,41 @@ func TestCreateUserRejectsDuplicateEmail(t *testing.T) {
 	err := svc.CreateUser("dup@rentcar.com", "password123", RoleAdmin)
 	if err == nil {
 		t.Fatal("expected error on duplicate email, got nil")
+	}
+}
+
+func TestLoginRejectsPendingAccount(t *testing.T) {
+	repo := &stubRepo{}
+	svc := newTestService(repo)
+	_ = svc.Register("driver@rentcar.com", "password123") // pending
+
+	_, _, err := svc.Login("driver@rentcar.com", "password123")
+	if !errors.Is(err, ErrAccountPending) {
+		t.Fatalf("expected ErrAccountPending, got %v", err)
+	}
+}
+
+func TestApproveUserAllowsLogin(t *testing.T) {
+	repo := &stubRepo{}
+	svc := newTestService(repo)
+	_ = svc.Register("driver@rentcar.com", "password123")
+	u, _ := repo.FindByEmail("driver@rentcar.com")
+
+	if err := svc.ApproveUser(u.ID); err != nil {
+		t.Fatalf("ApproveUser returned error: %v", err)
+	}
+	if repo.users[0].Status != StatusApproved {
+		t.Errorf("Status after approve = %q, want %q", repo.users[0].Status, StatusApproved)
+	}
+	if _, _, err := svc.Login("driver@rentcar.com", "password123"); err != nil {
+		t.Errorf("login after approval should succeed, got %v", err)
+	}
+}
+
+func TestApproveUnknownUser(t *testing.T) {
+	svc := newTestService(&stubRepo{})
+	if err := svc.ApproveUser("stub-id-404"); !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected ErrUserNotFound, got %v", err)
 	}
 }
 

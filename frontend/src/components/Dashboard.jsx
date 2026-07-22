@@ -6,6 +6,7 @@ import {
   Droplet,
   MapPin,
   Map,
+  Search,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { useWebSocket } from "../contexts/WebSocketContext";
@@ -16,6 +17,7 @@ import NotificationBell from "./notifications/NotificationBell";
 import NotificationsPage from "./notifications/NotificationsPage";
 import { engineTempLevel, coolantLevel, fuelLevel, LEVEL_STYLES } from "../lib/status";
 import { loadPreferences } from "../lib/preferences";
+import { filterCars } from "../lib/fleet";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8010";
 
@@ -30,6 +32,7 @@ export default function Dashboard({ onLogout }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [prefs, setPrefs] = useState(loadPreferences);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetchUserInfo();
@@ -99,6 +102,9 @@ export default function Dashboard({ onLogout }) {
   if (showNotifications) {
     return <NotificationsPage onBack={() => setShowNotifications(false)} />;
   }
+
+  const totalCars = Object.keys(cars).length;
+  const visibleCars = filterCars(cars, search);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -202,8 +208,9 @@ export default function Dashboard({ onLogout }) {
               Kontrolna tabla voznog parka
             </h2>
             <p className="text-gray-600">
-              Praćenje vozila u realnom vremenu ({Object.keys(cars).length}{" "}
-              aktivnih)
+              {search.trim()
+                ? `Prikazano ${visibleCars.length} od ${totalCars} vozila`
+                : `Praćenje vozila u realnom vremenu (${totalCars} aktivnih)`}
             </p>
           </div>
 
@@ -224,8 +231,21 @@ export default function Dashboard({ onLogout }) {
           </div>
         )}
 
+        {totalCars > 0 && (
+          <div className="mb-6 relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Pretraži vozila po imenu (npr. CAR001)"
+              className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white shadow-sm"
+            />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Object.values(cars).map((car) => {
+          {visibleCars.map((car) => {
             const engineLvl = engineTempLevel(car.engine_temperature, prefs);
             const coolantLvl = coolantLevel(car.engine_coolant_temp, prefs);
             const fuelLvl = fuelLevel(car.fuel_level, prefs);
@@ -333,13 +353,25 @@ export default function Dashboard({ onLogout }) {
           })}
         </div>
 
-        {Object.keys(cars).length === 0 && (
+        {totalCars === 0 && (
           <div className="bg-white rounded-3xl shadow-xl p-12 text-center">
             <Car className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-800 mb-2">
               Nema aktivnih vozila
             </h3>
             <p className="text-gray-600">Čekanje telemetrijskih podataka...</p>
+          </div>
+        )}
+
+        {totalCars > 0 && visibleCars.length === 0 && (
+          <div className="bg-white rounded-3xl shadow-xl p-12 text-center">
+            <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-800 mb-2">
+              Nema rezultata
+            </h3>
+            <p className="text-gray-600">
+              Nijedno vozilo ne odgovara pretrazi „{search}".
+            </p>
           </div>
         )}
       </main>

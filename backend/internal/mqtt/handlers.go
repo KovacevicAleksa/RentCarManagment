@@ -7,6 +7,7 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 
+	"github.com/KovacevicAleksa/rentcar/backend/internal/carstats"
 	"github.com/KovacevicAleksa/rentcar/backend/internal/monitoring"
 )
 
@@ -21,9 +22,20 @@ type CarTelemetry struct {
 	CheckEngine       bool      `json:"check_engine"`
 	Timestamp         time.Time `json:"timestamp"`
 
-	// OverheatFrequency is computed by the backend (not sent by the car) and
-	// attached before broadcasting so clients get the live derived value.
+	// The following are computed by the backend (not sent by the car) and
+	// attached before broadcasting so clients get the live derived values.
+	// OverheatFrequency is the lifetime episodes-per-operating-hour rate.
 	OverheatFrequency float64 `json:"overheat_frequency"`
+	// Reliability is the overall 0-100 rating over the trailing 30 days.
+	Reliability float64 `json:"reliability"`
+	// TemperatureScore is the 0-100 engine-temperature health rating (30 days).
+	TemperatureScore float64 `json:"temperature_score"`
+	// CheckEngineScore is the 0-100 check-engine health rating (30 days).
+	CheckEngineScore float64 `json:"check_engine_score"`
+	// CheckEngineCount is the number of check-engine episodes in the last 30 days.
+	CheckEngineCount int `json:"check_engine_count"`
+	// OverheatCount is the number of overheat episodes in the last 30 days.
+	OverheatCount int `json:"overheat_count"`
 }
 
 type TelemetryBroadcaster interface {
@@ -42,10 +54,10 @@ type TelemetryAlerter interface {
 }
 
 // TelemetryProcessor accumulates per-car statistics from the telemetry stream
-// and returns a derived value (the car's current overheat frequency) to enrich
-// the outgoing broadcast.
+// and returns the car's derived health snapshot to enrich the outgoing
+// broadcast.
 type TelemetryProcessor interface {
-	Observe(carID string, engineTemp float64) float64
+	Observe(carID string, engineTemp float64, checkEngine bool) carstats.Result
 }
 
 var broadcaster TelemetryBroadcaster
@@ -81,7 +93,7 @@ func DefaultMessageHandler(client mqtt.Client, msg mqtt.Message) {
 
 func CarTelemetryHandler(client mqtt.Client, msg mqtt.Message) {
 	var telemetry CarTelemetry
-	
+
 	if err := json.Unmarshal(msg.Payload(), &telemetry); err != nil {
 		log.Printf("Error parsing telemetry: %v", err)
 		return
@@ -128,7 +140,13 @@ func CarTelemetryHandler(client mqtt.Client, msg mqtt.Message) {
 	}
 
 	if processor != nil {
-		telemetry.OverheatFrequency = processor.Observe(telemetry.CarID, telemetry.EngineTemperature)
+		res := processor.Observe(telemetry.CarID, telemetry.EngineTemperature, telemetry.CheckEngine)
+		telemetry.OverheatFrequency = res.OverheatFrequency
+		telemetry.Reliability = res.Reliability
+		telemetry.TemperatureScore = res.TemperatureScore
+		telemetry.CheckEngineScore = res.CheckEngineScore
+		telemetry.CheckEngineCount = res.CheckEngineCount
+		telemetry.OverheatCount = res.OverheatCount
 	}
 
 	if broadcaster != nil {
