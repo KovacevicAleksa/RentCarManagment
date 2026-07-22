@@ -1,28 +1,43 @@
 package history
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
 
-// mockHistoryRepo is an in-memory HistoryRepo used in tests.
+// mockHistoryRepo is an in-memory HistoryRepo used in tests. It is mutex-guarded
+// because the service flushes from a background goroutine while tests read state.
 type mockHistoryRepo struct {
+	mu      sync.Mutex
 	records []CarHistory
 }
 
 func (m *mockHistoryRepo) Create(h *CarHistory) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.records = append(m.records, *h)
 	return nil
 }
 
 func (m *mockHistoryRepo) CreateBatch(items []*CarHistory) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, h := range items {
 		m.records = append(m.records, *h)
 	}
 	return nil
 }
 
+func (m *mockHistoryRepo) count() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.records)
+}
+
 func (m *mockHistoryRepo) FindByCarID(carID string, limit int) ([]CarHistory, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	var result []CarHistory
 	for _, r := range m.records {
 		if r.CarID == carID {
@@ -36,6 +51,8 @@ func (m *mockHistoryRepo) FindByCarID(carID string, limit int) ([]CarHistory, er
 }
 
 func (m *mockHistoryRepo) FindByCarIDAndTimeRange(carID string, start, end time.Time) ([]CarHistory, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	var result []CarHistory
 	for _, r := range m.records {
 		if r.CarID == carID && !r.Timestamp.Before(start) && !r.Timestamp.After(end) {
@@ -46,6 +63,8 @@ func (m *mockHistoryRepo) FindByCarIDAndTimeRange(carID string, start, end time.
 }
 
 func (m *mockHistoryRepo) GetLatestByCarID(carID string) (*CarHistory, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for i := len(m.records) - 1; i >= 0; i-- {
 		if m.records[i].CarID == carID {
 			r := m.records[i]
@@ -76,12 +95,12 @@ func TestSaveTelemetry_Success(t *testing.T) {
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if len(repo.records) == 1 {
+		if repo.count() == 1 {
 			return
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	t.Fatalf("expected 1 record, got %d", len(repo.records))
+	t.Fatalf("expected 1 record, got %d", repo.count())
 }
 
 func TestGetRecentHistory_LimitClampedToDefault(t *testing.T) {

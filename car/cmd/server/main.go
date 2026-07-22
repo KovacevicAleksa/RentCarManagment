@@ -22,19 +22,32 @@ type CarTelemetry struct {
 	GasThrottle        float64   `json:"gas_throttle"`
 	EngineCoolantTemp  float64   `json:"engine_coolant_temp"`
 	FuelLevel          float64   `json:"fuel_level"`
+	CheckEngine        bool      `json:"check_engine"`
 	Timestamp          time.Time `json:"timestamp"`
 }
 
+// overheatChance is the per-tick probability that a healthy car begins an
+// engine-overheating fault episode. Tuned so a small fleet produces only a
+// couple of overheating events per minute, keeping alarm notifications rare.
+const overheatChance = 0.006
+
+// checkEngineChance is the per-tick probability that a car raises a
+// check-engine fault. Once raised it stays on for a short episode, mimicking a
+// diagnostic trouble code that lingers before clearing.
+const checkEngineChance = 0.004
+
 type CarSimulator struct {
-	carID       string
-	latitude    float64
-	longitude   float64
-	heading     float64
-	speed       float64
-	fuelLevel   float64
-	engineTemp  float64
-	coolantTemp float64
-	throttle    float64
+	carID            string
+	latitude         float64
+	longitude        float64
+	heading          float64
+	speed            float64
+	fuelLevel        float64
+	engineTemp       float64
+	coolantTemp      float64
+	throttle         float64
+	overheatTicks    int
+	checkEngineTicks int
 }
 
 func NewCarSimulator(carID string, startLat, startLon float64) *CarSimulator {
@@ -59,9 +72,21 @@ func (s *CarSimulator) GetNextTelemetry() CarTelemetry {
 	targetSpeed := s.throttle * 120
 	s.speed += (targetSpeed - s.speed) * 0.2
 	
-	targetEngineTemp := 60 + s.throttle*60 + rand.Float64()*15
-	s.engineTemp += (targetEngineTemp - s.engineTemp) * 0.1
-	
+	// Healthy engines run comfortably below the 110°C alarm threshold.
+	targetEngineTemp := 70 + s.throttle*20 + rand.Float64()*5
+
+	// Occasionally a car enters an overheating fault episode that pushes the
+	// engine temperature above the alarm threshold for a short while.
+	if s.overheatTicks == 0 && rand.Float64() < overheatChance {
+		s.overheatTicks = 8 + rand.Intn(7)
+		log.Printf("🔥 [%s] entering overheating episode", s.carID)
+	}
+	if s.overheatTicks > 0 {
+		targetEngineTemp = 120 + rand.Float64()*8
+		s.overheatTicks--
+	}
+	s.engineTemp += (targetEngineTemp - s.engineTemp) * 0.25
+
 	targetCoolantTemp := s.engineTemp - 10 + rand.Float64()*5
 	s.coolantTemp += (targetCoolantTemp - s.coolantTemp) * 0.15
 	
@@ -73,12 +98,21 @@ func (s *CarSimulator) GetNextTelemetry() CarTelemetry {
 	
 	if s.speed > 5 {
 		s.heading += (rand.Float64() - 0.5) * 10
-		
+
 		distanceKm := (s.speed / 3600) * 5
 		s.latitude += (distanceKm * 0.009) * math.Cos(s.heading*math.Pi/180)
 		s.longitude += (distanceKm * 0.009) * math.Sin(s.heading*math.Pi/180)
 	}
-	
+
+	if s.checkEngineTicks == 0 && rand.Float64() < checkEngineChance {
+		s.checkEngineTicks = 10 + rand.Intn(20)
+		log.Printf("⚠️  [%s] check-engine fault raised", s.carID)
+	}
+	checkEngine := s.checkEngineTicks > 0
+	if s.checkEngineTicks > 0 {
+		s.checkEngineTicks--
+	}
+
 	return CarTelemetry{
 		CarID:             s.carID,
 		EngineTemperature: s.engineTemp,
@@ -87,6 +121,7 @@ func (s *CarSimulator) GetNextTelemetry() CarTelemetry {
 		GasThrottle:       s.throttle,
 		EngineCoolantTemp: s.coolantTemp,
 		FuelLevel:         s.fuelLevel,
+		CheckEngine:       checkEngine,
 		Timestamp:         time.Now(),
 	}
 }
@@ -157,7 +192,7 @@ func main() {
 	
 	log.Println("✅ Car fleet service connected to MQTT broker")
 	
-	const numCars = 10000
+	const numCars = 20
 	const centerLat = 44.7866
 	const centerLon = 20.4489
 	const spread = 0.05

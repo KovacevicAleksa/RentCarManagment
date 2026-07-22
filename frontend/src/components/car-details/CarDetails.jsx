@@ -2,6 +2,7 @@ import { useWebSocket } from "../../contexts/WebSocketContext";
 import CarDetailsHeader from "./CarDetailsHeader";
 import CarMap from "./CarMap";
 import CarInfoPanel from "./CarInfoPanel";
+import ReliabilityOverview from "./ReliabilityOverview";
 import LoadingState from "./LoadingState";
 import CarHistoryCharts from "./CarHistoryCharts";
 
@@ -23,8 +24,9 @@ export default function CarDetails({ carId, onBack }) {
         ) : (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-2 space-y-6">
                 <CarMap carId={carId} carData={carData} />
+                <ReliabilityOverview carData={carData} />
               </div>
               <CarInfoPanel carData={carData} />
             </div>

@@ -124,6 +124,72 @@ func TestAdminListUsersHidesPasswords(t *testing.T) {
 	}
 }
 
+func TestLoginHandlerRejectsPendingAccount(t *testing.T) {
+	r, svc, _ := newTestRouter(t)
+	_ = svc.Register("pending@rentcar.com", "password123") // pending
+
+	w := doJSON(r, http.MethodPost, "/auth/login", gin.H{
+		"email": "pending@rentcar.com", "password": "password123",
+	}, nil)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 (body: %s)", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminApproveUserEnablesLogin(t *testing.T) {
+	r, svc, tokens := newTestRouter(t)
+	_ = svc.Register("pending@rentcar.com", "password123")
+	u, _ := svc.repo.FindByEmail("pending@rentcar.com")
+	admin := cookieFor(tokens, "a-1", "boss@rentcar.com", RoleAdmin)
+
+	w := doJSON(r, http.MethodPost, "/admin/users/"+u.ID+"/approve", nil, admin)
+	if w.Code != http.StatusOK {
+		t.Fatalf("approve status = %d, want 200 (body: %s)", w.Code, w.Body.String())
+	}
+
+	lw := doJSON(r, http.MethodPost, "/auth/login", gin.H{
+		"email": "pending@rentcar.com", "password": "password123",
+	}, nil)
+	if lw.Code != http.StatusOK {
+		t.Errorf("login after approve = %d, want 200 (body: %s)", lw.Code, lw.Body.String())
+	}
+}
+
+func TestAdminApproveRequiresAdminRole(t *testing.T) {
+	r, svc, tokens := newTestRouter(t)
+	_ = svc.Register("pending@rentcar.com", "password123")
+	u, _ := svc.repo.FindByEmail("pending@rentcar.com")
+	regular := cookieFor(tokens, "u-1", "driver@rentcar.com", RoleUser)
+
+	w := doJSON(r, http.MethodPost, "/admin/users/"+u.ID+"/approve", nil, regular)
+	if w.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", w.Code)
+	}
+}
+
+func TestAdminListUsersIncludesStatus(t *testing.T) {
+	r, svc, tokens := newTestRouter(t)
+	_ = svc.Register("pending@rentcar.com", "password123")
+	admin := cookieFor(tokens, "a-1", "boss@rentcar.com", RoleAdmin)
+
+	w := doJSON(r, http.MethodGet, "/admin/users", nil, admin)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	var resp struct {
+		Users []struct {
+			Email  string `json:"email"`
+			Status string `json:"status"`
+		} `json:"users"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(resp.Users) != 1 || resp.Users[0].Status != StatusPending {
+		t.Errorf("expected pending status in listing, got %+v", resp.Users)
+	}
+}
+
 func TestMeReturnsRole(t *testing.T) {
 	r, _, tokens := newTestRouter(t)
 	admin := cookieFor(tokens, "a-1", "boss@rentcar.com", RoleAdmin)

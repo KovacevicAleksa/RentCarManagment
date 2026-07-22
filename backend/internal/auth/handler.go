@@ -50,18 +50,22 @@ func LoginHandler(service *AuthService) gin.HandlerFunc {
 
 		token, userID, err := service.Login(req.Email, req.Password)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			status := http.StatusUnauthorized
+			if errors.Is(err, ErrAccountPending) {
+				status = http.StatusForbidden
+			}
+			c.JSON(status, gin.H{"error": err.Error()})
 			return
 		}
 
 		c.SetCookie(
-			"token",                           
-			token,                             
-			int(time.Hour*72/time.Second),     
-			"/",                               
-			"",                                
-			false,                             
-			true,                              
+			"token",
+			token,
+			int(time.Hour*72/time.Second),
+			"/",
+			"",
+			false,
+			true,
 		)
 
 		c.JSON(http.StatusOK, gin.H{
@@ -76,7 +80,7 @@ func LogoutHandler() gin.HandlerFunc {
 		c.SetCookie(
 			"token",
 			"",
-			-1,     
+			-1,
 			"/",
 			"",
 			false,
@@ -113,13 +117,14 @@ type CreateUserRequest struct {
 
 // UserResponse is the safe representation of a user (never exposes the hash).
 type UserResponse struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	ID     string `json:"id"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
+	Status string `json:"status"`
 }
 
 func toUserResponse(u User) UserResponse {
-	return UserResponse{ID: u.ID, Email: u.Email, Role: u.Role}
+	return UserResponse{ID: u.ID, Email: u.Email, Role: u.Role, Status: u.Status}
 }
 
 type ChangePasswordRequest struct {
@@ -220,6 +225,17 @@ func AdminResetPasswordHandler(service *AuthService) gin.HandlerFunc {
 			"message":            "Password reset successfully",
 			"temporary_password": temp,
 		})
+	}
+}
+
+func AdminApproveUserHandler(service *AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.Param("id")
+		if err := service.ApproveUser(userID); err != nil {
+			c.JSON(accountErrorStatus(err), gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "User approved successfully"})
 	}
 }
 

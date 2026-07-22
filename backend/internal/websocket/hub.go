@@ -62,20 +62,31 @@ func (h *Hub) Run() {
 	}
 }
 
+// wsMessage is the envelope every broadcast is wrapped in, so clients can tell
+// telemetry updates apart from notifications on the single WebSocket stream.
+type wsMessage struct {
+	Type    string `json:"type"`
+	Payload any    `json:"payload"`
+}
+
 func (h *Hub) BroadcastTelemetry(data interface{}) {
-	jsonData, err := json.Marshal(data)
+	h.broadcastEnvelope("telemetry", data)
+}
+
+func (h *Hub) BroadcastNotification(data interface{}) {
+	h.broadcastEnvelope("notification", data)
+}
+
+func (h *Hub) broadcastEnvelope(msgType string, payload interface{}) {
+	jsonData, err := json.Marshal(wsMessage{Type: msgType, Payload: payload})
 	if err != nil {
-		log.Printf("❌ Error marshaling telemetry: %v", err)
+		log.Printf("❌ Error marshaling %s message: %v", msgType, err)
 		return
 	}
-	
+
 	select {
 	case h.broadcast <- jsonData:
-		h.mu.RLock()
-		clientCount := len(h.clients)
-		h.mu.RUnlock()
-		log.Printf("📤 Broadcasted telemetry to %d clients", clientCount)
 	default:
-		log.Printf("⚠️ Broadcast channel full, dropping message")
+		log.Printf("⚠️ Broadcast channel full, dropping %s message", msgType)
 	}
 }

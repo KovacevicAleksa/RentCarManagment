@@ -10,6 +10,10 @@ type User struct {
 	Email    string `gorm:"uniqueIndex"`
 	Password string
 	Role     string `gorm:"default:user"`
+	// Status is the approval state (pending/approved). The column default is
+	// 'approved' so accounts that predate this feature stay usable after
+	// migration; new self-registrations are set to pending explicitly.
+	Status     string `gorm:"default:approved"`
 	gorm.Model `gorm:"embedded;embeddedPrefix:meta_"`
 }
 

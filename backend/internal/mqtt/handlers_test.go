@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
+
+	"github.com/KovacevicAleksa/rentcar/backend/internal/carstats"
 )
 
 // fakeMessage implements paho's mqtt.Message for handler tests.
@@ -22,7 +24,7 @@ func (m *fakeMessage) Payload() []byte   { return m.payload }
 func (m *fakeMessage) Ack()              {}
 
 type savedTelemetry struct {
-	carID         string
+	carID          string
 	fuel, lat, lon float64
 }
 
@@ -38,10 +40,28 @@ func (s *fakeSaver) SaveTelemetry(carID string, fuel, lat, lon float64) error {
 
 type fakeBroadcaster struct {
 	calls int
+	last  interface{}
 }
 
 func (b *fakeBroadcaster) BroadcastTelemetry(data interface{}) {
 	b.calls++
+	b.last = data
+}
+
+// fakeProcessor records the arguments it is called with and returns a fixed
+// result so handler enrichment can be asserted.
+type fakeProcessor struct {
+	gotCarID       string
+	gotEngineTemp  float64
+	gotCheckEngine bool
+	result         carstats.Result
+}
+
+func (p *fakeProcessor) Observe(carID string, engineTemp float64, checkEngine bool) carstats.Result {
+	p.gotCarID = carID
+	p.gotEngineTemp = engineTemp
+	p.gotCheckEngine = checkEngine
+	return p.result
 }
 
 func withWiring(t *testing.T) (*fakeSaver, *fakeBroadcaster) {
@@ -82,6 +102,51 @@ func TestCarTelemetryHandlerSavesAndBroadcasts(t *testing.T) {
 	}
 	if bc.calls != 1 {
 		t.Errorf("expected 1 broadcast, got %d", bc.calls)
+	}
+}
+
+func TestCarTelemetryHandlerEnrichesBroadcastWithReliability(t *testing.T) {
+	_, bc := withWiring(t)
+	proc := &fakeProcessor{result: carstats.Result{
+		OverheatFrequency: 0.5,
+		OverheatCount:     1,
+		TemperatureScore:  90,
+		CheckEngineCount:  3,
+		CheckEngineScore:  85,
+		Reliability:       88,
+	}}
+	processor = proc
+	t.Cleanup(func() { processor = nil })
+
+	CarTelemetryHandler(nil, msgFor(t, CarTelemetry{
+		CarID: "CAR001", EngineTemperature: 112, CheckEngine: true,
+	}))
+
+	if proc.gotCarID != "CAR001" || proc.gotEngineTemp != 112 || !proc.gotCheckEngine {
+		t.Fatalf("processor called with wrong args: %+v", proc)
+	}
+
+	tel, ok := bc.last.(CarTelemetry)
+	if !ok {
+		t.Fatalf("broadcast payload is not CarTelemetry: %T", bc.last)
+	}
+	if tel.Reliability != 88 {
+		t.Errorf("reliability = %v, want 88", tel.Reliability)
+	}
+	if tel.TemperatureScore != 90 {
+		t.Errorf("temperature_score = %v, want 90", tel.TemperatureScore)
+	}
+	if tel.CheckEngineScore != 85 {
+		t.Errorf("check_engine_score = %v, want 85", tel.CheckEngineScore)
+	}
+	if tel.CheckEngineCount != 3 {
+		t.Errorf("check_engine_count = %v, want 3", tel.CheckEngineCount)
+	}
+	if tel.OverheatCount != 1 {
+		t.Errorf("overheat_count = %v, want 1", tel.OverheatCount)
+	}
+	if tel.OverheatFrequency != 0.5 {
+		t.Errorf("overheat_frequency = %v, want 0.5", tel.OverheatFrequency)
 	}
 }
 
